@@ -281,8 +281,6 @@
 
         <div id="errorMsg" class="error-msg"></div>
 
-        <div class="legend" id="legend"></div>
-
         <div class="info">
             <div class="info-row">
                 <span class="info-label">播放狀態：</span>
@@ -303,10 +301,6 @@
             <div class="info-row">
                 <span class="info-label">投擲手：</span>
                 <span class="info-value" id="statusHand">自動判斷中</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">已記錄投擲：</span>
-                <span class="info-value" id="statusThrowCount">0 次</span>
             </div>
             <div class="info-row">
                 <span class="info-label">背景模式：</span>
@@ -334,7 +328,6 @@
         const canvasContainer = document.getElementById("canvasContainer");
         const loadingText = document.getElementById("loadingText");
         const errorMsg = document.getElementById("errorMsg");
-        const legend = document.getElementById("legend");
 
         const uploadBtn = document.getElementById("uploadBtn");
         const fileInput = document.getElementById("fileInput");
@@ -351,7 +344,6 @@
         const statusSkeletonShow = document.getElementById("statusSkeletonShow");
         const statusWristTrace = document.getElementById("statusWristTrace");
         const statusHand = document.getElementById("statusHand");
-        const statusThrowCount = document.getElementById("statusThrowCount");
         const statusBlackBg = document.getElementById("statusBlackBg");
         const statusFPS = document.getElementById("statusFPS");
         const statusRecording = document.getElementById("statusRecording");
@@ -379,7 +371,7 @@
 
         // 低於此可信度的關鍵點視為不可靠，不繪製也不納入軌跡
         const MIN_VISIBILITY_DRAW = 0.35;
-        const MIN_VISIBILITY_TRACE = 0.5;
+        const MIN_VISIBILITY_TRACE = 0.3;
 
         // 單次偵測間，關鍵點在正規化座標中不可能超過的位移量（超過視為誤判）
         const MAX_JUMP_PER_DETECT = 0.22;
@@ -516,69 +508,20 @@
             });
         }
 
-        // === 手腕軌跡：分段記錄，每次舉手換一個顏色 ===
+        // === 手腕軌跡：單一紅色連續軌跡 ===
         let wristTraceEnabled = true;
 
-        // 每一段代表一次投擲，顏色依序循環，方便比對前後幾次的軌跡落差
-        const SEGMENT_COLORS = [
-            "255,80,80",    // 紅
-            "80,210,255",   // 青
-            "255,215,70",   // 黃
-            "120,245,140",  // 綠
-            "255,140,240",  // 粉紫
-            "255,165,60",   // 橘
-            "160,175,255",  // 藍紫
-            "110,255,215"   // 藍綠
-        ];
+        const TRACE_COLOR = "255,60,60";     // 軌跡固定紅色
+        const MAX_TRACE_POINTS = 800;        // 保留夠長的軌跡，不會中途消失
+        const MIN_TRACE_SPACING = 0.004;     // 幾乎沒動就不重複記錄
 
-        const MAX_SEGMENTS = 12;          // 最多保留幾次投擲的軌跡
-        const MAX_POINTS_PER_SEGMENT = 800;
-        const MIN_TRACE_SPACING = 0.004;  // 幾乎沒動就不重複記錄
-
-        // 一次投擲的定義：手往上抬架鏢（開始記錄）→ 投擲到前臂打直（結束記錄）。
-        // 之後手放下回去拿鏢的過程屬於 recovery，不記錄軌跡，
-        // 等手肘再次彎曲回架鏢姿勢才允許判定下一次投擲。
-        const RAISE_TRIGGER = 0.015;        // 架鏢上抬的幅度不大，門檻取小
-        const DOWN_NOISE_TOLERANCE = 0.004; // 低於此的向下移動視為雜訊
-        const ELBOW_EXTENDED_ANGLE = 150;   // 肩-肘-腕夾角大於此度數視為前臂打直＝出手完成
-        const ELBOW_FLEXED_ANGLE = 115;     // 手肘彎回此度數以下，視為回到準備姿勢
-        const MIN_THROW_INTERVAL_MS = 500;
-        const MAX_THROW_DURATION_MS = 3000; // 保險：超過此時間仍未偵測到打直就強制結束
-
-        // 手臂三點索引，用來計算手肘角度
-        const ARM_INDICES = {
-            left: { shoulder: 11, elbow: 13, wrist: 15 },
-            right: { shoulder: 12, elbow: 14, wrist: 16 }
-        };
-
-        // 計算肩-肘-腕夾角（度）
-        function elbowAngle(landmarks, side) {
-            const ix = ARM_INDICES[side];
-            const s = landmarks[ix.shoulder];
-            const e = landmarks[ix.elbow];
-            const w = landmarks[ix.wrist];
-            if (!s || !e || !w) return null;
-
-            const v1x = s.x - e.x, v1y = s.y - e.y;
-            const v2x = w.x - e.x, v2y = w.y - e.y;
-            const m1 = Math.hypot(v1x, v1y);
-            const m2 = Math.hypot(v2x, v2y);
-            if (m1 === 0 || m2 === 0) return null;
-
-            const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (m1 * m2)));
-            return (Math.acos(cos) * 180) / Math.PI;
-        }
+        // 手腕索引（左 15 / 右 16）
+        const WRIST_INDEX = { left: 15, right: 16 };
 
         function createTraceState() {
             return {
-                segments: [],        // [{ color, points: [{x,y}], index }]
-                phase: "idle",       // idle（等待架鏢）→ throwing（記錄中）→ recovery（拿鏢，不記錄）
-                upAccum: 0,          // 連續向上移動的累積量
-                lastY: null,
-                throwStartTime: 0,
-                lastSegmentTime: 0,
-                throwCount: 0,
-                moveAmount: 0,       // 累積移動量，用來判斷哪隻手是投擲手
+                points: [],      // [{x, y}]
+                moveAmount: 0,   // 累積移動量，用來判斷哪隻手是投擲手
                 prevPoint: null
             };
         }
@@ -596,84 +539,19 @@
             traceStates.right = createTraceState();
             dominantHand = null;
             statusHand.textContent = "自動判斷中";
-            updateThrowStatus();
-            renderLegend();
         }
 
-        function startNewSegment(state) {
-            state.throwCount += 1;
-            const color = SEGMENT_COLORS[(state.throwCount - 1) % SEGMENT_COLORS.length];
-            state.segments.push({ color, points: [], index: state.throwCount });
-            if (state.segments.length > MAX_SEGMENTS) state.segments.shift();
-        }
-
-        // 投擲週期狀態機：idle → throwing（手抬起架鏢開始）→ recovery（前臂打直出手後）→ idle
-        function updateThrowPhase(state, landmarks, side, y, now) {
-            const angle = elbowAngle(landmarks, side);
-
-            if (state.lastY === null) {
-                state.lastY = y;
-                return;
-            }
-            const dy = y - state.lastY; // y 往下為正，dy < 0 代表手往上
-            state.lastY = y;
-
-            if (state.phase === "idle") {
-                if (dy < 0) {
-                    state.upAccum += -dy;
-                } else if (dy > DOWN_NOISE_TOLERANCE) {
-                    state.upAccum = 0;
-                }
-
-                const enoughTime = now - state.lastSegmentTime > MIN_THROW_INTERVAL_MS;
-                // 手肘還彎著才算「架鏢」，避免手already打直時誤觸發
-                const elbowBent = angle === null || angle < ELBOW_EXTENDED_ANGLE;
-
-                if (state.upAccum >= RAISE_TRIGGER && enoughTime && elbowBent) {
-                    startNewSegment(state);
-                    state.phase = "throwing";
-                    state.throwStartTime = now;
-                    state.lastSegmentTime = now;
-                    state.upAccum = 0;
-                    updateThrowStatus();
-                    renderLegend();
-                }
-            } else if (state.phase === "throwing") {
-                // 前臂打直＝出手完成，本次軌跡到此為止
-                const extended = angle !== null && angle >= ELBOW_EXTENDED_ANGLE;
-                const timedOut = now - state.throwStartTime > MAX_THROW_DURATION_MS;
-                if (extended || timedOut) {
-                    state.phase = "recovery";
-                    state.upAccum = 0;
-                }
-            } else {
-                // recovery：回去拿鏢，不記錄軌跡；手肘彎回準備姿勢才開放下一次判定
-                if (angle !== null && angle <= ELBOW_FLEXED_ANGLE) {
-                    state.phase = "idle";
-                    state.upAccum = 0;
-                }
-            }
-        }
-
-        function pushTracePoint(state, landmarks, side, now) {
-            const lm = landmarks[ARM_INDICES[side].wrist];
+        function pushTracePoint(state, lm) {
             if (!lm) return;
             if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
 
-            updateThrowPhase(state, landmarks, side, lm.y, now);
-
-            // 只有「架鏢 → 出手」這段才記錄，回去拿鏢的過程不畫
-            if (state.phase !== "throwing") return;
-            if (state.segments.length === 0) return;
-
-            const seg = state.segments[state.segments.length - 1];
-            const last = seg.points[seg.points.length - 1];
+            const last = state.points[state.points.length - 1];
             if (last) {
                 const d = Math.hypot(lm.x - last.x, lm.y - last.y);
                 if (d < MIN_TRACE_SPACING) return;
             }
-            seg.points.push({ x: lm.x, y: lm.y });
-            if (seg.points.length > MAX_POINTS_PER_SEGMENT) seg.points.shift();
+            state.points.push({ x: lm.x, y: lm.y });
+            if (state.points.length > MAX_TRACE_POINTS) state.points.shift();
         }
 
         // 累積該手的移動量，供投擲手判定
@@ -686,11 +564,11 @@
             state.prevPoint = { x: lm.x, y: lm.y };
         }
 
-        function updateWristTrace(landmarks, now) {
+        function updateWristTrace(landmarks) {
             if (!landmarks || !Array.isArray(landmarks)) return;
 
-            const leftLm = landmarks[LEFT_WRIST];
-            const rightLm = landmarks[RIGHT_WRIST];
+            const leftLm = landmarks[WRIST_INDEX.left];
+            const rightLm = landmarks[WRIST_INDEX.right];
             accumulateMovement(traceStates.left, leftLm);
             accumulateMovement(traceStates.right, rightLm);
 
@@ -698,28 +576,23 @@
             if (hand !== dominantHand) {
                 dominantHand = hand;
                 statusHand.textContent = hand === "right" ? "右手" : "左手";
-                renderLegend();
             }
 
-            pushTracePoint(traceStates[hand], landmarks, hand, now);
+            pushTracePoint(traceStates[hand], hand === "right" ? rightLm : leftLm);
         }
 
-        // 畫所有軌跡段：整段維持同一個顏色與粗細，不淡出、不消失
+        function activeTraceState() {
+            return traceStates[dominantHand || "right"];
+        }
+
+        // 畫手腕軌跡：固定紅色、固定粗細，不淡出、不消失
         function drawWristTrace() {
-            for (const key of ["left", "right"]) {
-                for (const seg of traceStates[key].segments) {
-                    drawSegment(seg);
-                }
-            }
-        }
-
-        function drawSegment(seg) {
-            const pts = seg.points;
+            const pts = activeTraceState().points;
             if (pts.length < 2) return;
 
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
-            ctx.strokeStyle = `rgba(${seg.color},0.9)`;
+            ctx.strokeStyle = `rgba(${TRACE_COLOR},0.9)`;
             ctx.lineWidth = 4;
 
             ctx.beginPath();
@@ -740,32 +613,6 @@
                 ctx.lineTo(last.x * canvas.width, last.y * canvas.height);
             }
             ctx.stroke();
-        }
-
-        function activeTraceState() {
-            return traceStates[dominantHand || "right"];
-        }
-
-        function updateThrowStatus() {
-            statusThrowCount.textContent = activeTraceState().throwCount + " 次";
-        }
-
-        // 圖例：列出目前畫面上每一段軌跡的顏色與編號
-        function renderLegend() {
-            const segs = activeTraceState().segments;
-
-            if (!wristTraceEnabled || segs.length === 0) {
-                legend.classList.remove("show");
-                legend.innerHTML = "";
-                return;
-            }
-            legend.classList.add("show");
-            legend.innerHTML = segs
-                .map(
-                    (s) =>
-                        `<span class="legend-item"><span class="legend-swatch" style="background:rgb(${s.color})"></span>第 ${s.index} 次</span>`
-                )
-                .join("");
         }
 
         // === FPS 計算相關 ===
@@ -909,7 +756,7 @@
                     lastLandmarks = smoothLandmarks(result.landmarks[0], now);
                     // 3. 軌跡只在拿到新偵測結果時累積
                     if (wristTraceEnabled) {
-                        updateWristTrace(lastLandmarks, now);
+                        updateWristTrace(lastLandmarks);
                     }
                 }
 
@@ -1190,7 +1037,6 @@
             toggleWristTraceBtn.textContent = wristTraceEnabled ? "手腕軌跡：開" : "手腕軌跡：關";
             statusWristTrace.textContent = wristTraceEnabled ? "開" : "關";
             if (!wristTraceEnabled) clearWristTrace();
-            renderLegend();
         };
 
         window.toggleBlackBg = function () {
