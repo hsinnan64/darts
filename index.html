@@ -265,7 +265,7 @@
             <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseVideo()" disabled>暫停</button>
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
-            <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：關</button>
+            <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：開</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
             <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
         </div>
@@ -298,7 +298,7 @@
             </div>
             <div class="info-row">
                 <span class="info-label">手腕軌跡：</span>
-                <span class="info-value" id="statusWristTrace">關</span>
+                <span class="info-value" id="statusWristTrace">開</span>
             </div>
             <div class="info-row">
                 <span class="info-label">投擲手：</span>
@@ -517,7 +517,7 @@
         }
 
         // === 手腕軌跡：分段記錄，每次舉手換一個顏色 ===
-        let wristTraceEnabled = false;
+        let wristTraceEnabled = true;
 
         // 每一段代表一次投擲，顏色依序循環，方便比對前後幾次的軌跡落差
         const SEGMENT_COLORS = [
@@ -535,21 +535,47 @@
         const MAX_POINTS_PER_SEGMENT = 800;
         const MIN_TRACE_SPACING = 0.004;  // 幾乎沒動就不重複記錄
 
-        // 一次投擲 = 舉手 → 出手 → 手放下。
-        // 觸發新的一段後會「上鎖」，必須等手確實放回原本高度才解鎖，
-        // 所以同一次投擲途中手腕上下小幅移動不會再切段換色。
-        const UP_TRIGGER_DISTANCE = 0.06;   // 要明顯舉手才算一次
+        // 一次投擲的定義：手往上抬架鏢（開始記錄）→ 投擲到前臂打直（結束記錄）。
+        // 之後手放下回去拿鏢的過程屬於 recovery，不記錄軌跡，
+        // 等手肘再次彎曲回架鏢姿勢才允許判定下一次投擲。
+        const RAISE_TRIGGER = 0.015;        // 架鏢上抬的幅度不大，門檻取小
         const DOWN_NOISE_TOLERANCE = 0.004; // 低於此的向下移動視為雜訊
-        const RETURN_MARGIN = 0.04;         // 手要放回觸發高度以下多少才解鎖
-        const MIN_SEGMENT_INTERVAL_MS = 800;
+        const ELBOW_EXTENDED_ANGLE = 150;   // 肩-肘-腕夾角大於此度數視為前臂打直＝出手完成
+        const ELBOW_FLEXED_ANGLE = 115;     // 手肘彎回此度數以下，視為回到準備姿勢
+        const MIN_THROW_INTERVAL_MS = 500;
+        const MAX_THROW_DURATION_MS = 3000; // 保險：超過此時間仍未偵測到打直就強制結束
+
+        // 手臂三點索引，用來計算手肘角度
+        const ARM_INDICES = {
+            left: { shoulder: 11, elbow: 13, wrist: 15 },
+            right: { shoulder: 12, elbow: 14, wrist: 16 }
+        };
+
+        // 計算肩-肘-腕夾角（度）
+        function elbowAngle(landmarks, side) {
+            const ix = ARM_INDICES[side];
+            const s = landmarks[ix.shoulder];
+            const e = landmarks[ix.elbow];
+            const w = landmarks[ix.wrist];
+            if (!s || !e || !w) return null;
+
+            const v1x = s.x - e.x, v1y = s.y - e.y;
+            const v2x = w.x - e.x, v2y = w.y - e.y;
+            const m1 = Math.hypot(v1x, v1y);
+            const m2 = Math.hypot(v2x, v2y);
+            if (m1 === 0 || m2 === 0) return null;
+
+            const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1y * v2y) / (m1 * m2)));
+            return (Math.acos(cos) * 180) / Math.PI;
+        }
 
         function createTraceState() {
             return {
                 segments: [],        // [{ color, points: [{x,y}], index }]
-                armed: true,         // true = 可判定新的一次投擲
+                phase: "idle",       // idle（等待架鏢）→ throwing（記錄中）→ recovery（拿鏢，不記錄）
                 upAccum: 0,          // 連續向上移動的累積量
                 lastY: null,
-                segmentStartY: null, // 觸發當下的手腕高度，用來判斷是否已放回
+                throwStartTime: 0,
                 lastSegmentTime: 0,
                 throwCount: 0,
                 moveAmount: 0,       // 累積移動量，用來判斷哪隻手是投擲手
@@ -581,8 +607,10 @@
             if (state.segments.length > MAX_SEGMENTS) state.segments.shift();
         }
 
-        // 依手腕垂直移動判斷是否為新的一次投擲
-        function updateTraceSegmentation(state, y, now) {
+        // 投擲週期狀態機：idle → throwing（手抬起架鏢開始）→ recovery（前臂打直出手後）→ idle
+        function updateThrowPhase(state, landmarks, side, y, now) {
+            const angle = elbowAngle(landmarks, side);
+
             if (state.lastY === null) {
                 state.lastY = y;
                 return;
@@ -590,37 +618,53 @@
             const dy = y - state.lastY; // y 往下為正，dy < 0 代表手往上
             state.lastY = y;
 
-            if (state.armed) {
+            if (state.phase === "idle") {
                 if (dy < 0) {
                     state.upAccum += -dy;
                 } else if (dy > DOWN_NOISE_TOLERANCE) {
-                    state.upAccum = 0; // 明顯往下，重新累積
+                    state.upAccum = 0;
                 }
 
-                const enoughTime = now - state.lastSegmentTime > MIN_SEGMENT_INTERVAL_MS;
-                if (state.upAccum >= UP_TRIGGER_DISTANCE && enoughTime) {
+                const enoughTime = now - state.lastSegmentTime > MIN_THROW_INTERVAL_MS;
+                // 手肘還彎著才算「架鏢」，避免手already打直時誤觸發
+                const elbowBent = angle === null || angle < ELBOW_EXTENDED_ANGLE;
+
+                if (state.upAccum >= RAISE_TRIGGER && enoughTime && elbowBent) {
                     startNewSegment(state);
+                    state.phase = "throwing";
+                    state.throwStartTime = now;
                     state.lastSegmentTime = now;
-                    state.segmentStartY = y;
                     state.upAccum = 0;
-                    state.armed = false; // 本次投擲進行中，不再切段
                     updateThrowStatus();
                     renderLegend();
                 }
-            } else if (state.segmentStartY !== null && y > state.segmentStartY + RETURN_MARGIN) {
-                // 手已放回觸發高度以下，才允許判定下一次投擲
-                state.armed = true;
-                state.upAccum = 0;
+            } else if (state.phase === "throwing") {
+                // 前臂打直＝出手完成，本次軌跡到此為止
+                const extended = angle !== null && angle >= ELBOW_EXTENDED_ANGLE;
+                const timedOut = now - state.throwStartTime > MAX_THROW_DURATION_MS;
+                if (extended || timedOut) {
+                    state.phase = "recovery";
+                    state.upAccum = 0;
+                }
+            } else {
+                // recovery：回去拿鏢，不記錄軌跡；手肘彎回準備姿勢才開放下一次判定
+                if (angle !== null && angle <= ELBOW_FLEXED_ANGLE) {
+                    state.phase = "idle";
+                    state.upAccum = 0;
+                }
             }
         }
 
-        function pushTracePoint(state, lm, now) {
+        function pushTracePoint(state, landmarks, side, now) {
+            const lm = landmarks[ARM_INDICES[side].wrist];
             if (!lm) return;
             if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
 
-            updateTraceSegmentation(state, lm.y, now);
+            updateThrowPhase(state, landmarks, side, lm.y, now);
 
-            if (state.segments.length === 0) return; // 還沒出現第一次舉手，先不畫
+            // 只有「架鏢 → 出手」這段才記錄，回去拿鏢的過程不畫
+            if (state.phase !== "throwing") return;
+            if (state.segments.length === 0) return;
 
             const seg = state.segments[state.segments.length - 1];
             const last = seg.points[seg.points.length - 1];
@@ -657,7 +701,7 @@
                 renderLegend();
             }
 
-            pushTracePoint(traceStates[hand], hand === "right" ? rightLm : leftLm, now);
+            pushTracePoint(traceStates[hand], landmarks, hand, now);
         }
 
         // 畫所有軌跡段：整段維持同一個顏色與粗細，不淡出、不消失
@@ -935,18 +979,24 @@
             try {
                 const stream = canvas.captureStream(30);
 
-                let selectedMimeType = "video/webm;codecs=vp9";
+                // WebM 放前面：Chrome / Edge 對 canvas 串流的 WebM 編碼最穩定，
+                // 部分版本雖然回報支援 MP4，實際錄 canvas 卻產不出可用的檔案。
+                let selectedMimeType = "";
                 const supportedMimeTypes = [
-                    "video/mp4;codecs=avc1.42E01E",
-                    "video/mp4",
                     "video/webm;codecs=vp9",
-                    "video/webm"
+                    "video/webm;codecs=vp8",
+                    "video/webm",
+                    "video/mp4"
                 ];
                 for (const mimeType of supportedMimeTypes) {
                     if (MediaRecorder.isTypeSupported(mimeType)) {
                         selectedMimeType = mimeType;
                         break;
                     }
+                }
+                if (!selectedMimeType) {
+                    showError("此瀏覽器不支援 MediaRecorder 錄影，請改用最新版 Chrome / Edge。");
+                    return;
                 }
 
                 mediaRecorder = new MediaRecorder(stream, {
@@ -965,8 +1015,16 @@
                 if (e.data && e.data.size > 0) recordedChunks.push(e.data);
             };
 
+            mediaRecorder.onerror = (e) => {
+                showError("錄製過程發生錯誤：" + (e.error ? e.error.name : "未知錯誤"));
+                console.error("MediaRecorder error:", e);
+            };
+
             mediaRecorder.onstop = () => {
-                if (!recordedChunks.length) return;
+                if (!recordedChunks.length) {
+                    showError("錄製結束但沒有取得任何畫面資料。\n\n請確認錄製期間影片有在播放（暫停時畫面不會更新，錄不到內容）。");
+                    return;
+                }
                 const mimeType = mediaRecorder.mimeType || "video/webm";
                 const fileExt = mimeType.includes("mp4") ? "mp4" : "webm";
 
@@ -981,11 +1039,17 @@
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
             };
 
-            mediaRecorder.start();
+            // 帶 timeslice：每秒就切出一塊資料，避免整段只在 stop 時才產生、
+            // 中途發生問題就整份錄影都拿不到
+            mediaRecorder.start(1000);
             isRecording = true;
             recordBtn.textContent = "停止錄製";
             recordBtn.classList.add("recording");
             statusRecording.textContent = "錄製中";
+
+            if (video.paused || video.ended) {
+                showError("提醒：目前影片沒有在播放，錄下來會是靜止畫面。請按「播放」後再錄製。");
+            }
         }
 
         function stopRecording() {
