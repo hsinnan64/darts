@@ -117,16 +117,27 @@
             color: #4c0519;
         }
 
-        /* 平滑開關：薄荷綠 */
-        .smooth-btn {
-            background: #99f6e4;
-            color: #134e4a;
-        }
-
         /* 純黑背景：深灰 */
         .blackbg-btn {
             background: #475569;
             color: #f8fafc;
+        }
+
+        /* 錄製：紅色（不要太亮） */
+        .record-btn {
+            background: #f97373;
+            color: #fff5f5;
+        }
+
+        .record-btn.recording {
+            background: #ef4444;
+            animation: pulse 1.1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239,68,68,0.55); }
+            70% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
 
         .control-btn:hover:not(:disabled) {
@@ -183,6 +194,35 @@
             white-space: pre-line;
         }
 
+        /* 投擲次數顏色圖例 */
+        .legend {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: #eef2ff;
+            border-radius: 12px;
+        }
+
+        .legend.show {
+            display: flex;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #334155;
+        }
+
+        .legend-swatch {
+            width: 18px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
         .info {
             background: #e0ecff;
             padding: 10px 12px;
@@ -212,7 +252,7 @@
 <body>
     <div class="container">
         <h1>飛鏢投擲骨架分析器</h1>
-        <div class="subtitle">穩定追蹤版：去尖刺濾波 + 離群點拒絕</div>
+        <div class="subtitle">每次舉手自動換色，軌跡完整保留可互相比對</div>
 
         <!-- 控制區：RWD -->
         <div class="controls" id="controls">
@@ -226,8 +266,8 @@
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：關</button>
-            <button class="control-btn smooth-btn" id="toggleSmoothBtn" onclick="toggleSmoothing()" disabled>平滑：開</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
+            <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -240,6 +280,8 @@
         </div>
 
         <div id="errorMsg" class="error-msg"></div>
+
+        <div class="legend" id="legend"></div>
 
         <div class="info">
             <div class="info-row">
@@ -259,8 +301,8 @@
                 <span class="info-value" id="statusWristTrace">關</span>
             </div>
             <div class="info-row">
-                <span class="info-label">平滑濾波：</span>
-                <span class="info-value" id="statusSmooth">開</span>
+                <span class="info-label">已記錄投擲：</span>
+                <span class="info-value" id="statusThrowCount">0 次</span>
             </div>
             <div class="info-row">
                 <span class="info-label">背景模式：</span>
@@ -269,6 +311,10 @@
             <div class="info-row">
                 <span class="info-label">目前幀率：</span>
                 <span class="info-value" id="statusFPS">-- FPS</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">錄製狀態：</span>
+                <span class="info-value" id="statusRecording">關</span>
             </div>
         </div>
     </div>
@@ -284,6 +330,7 @@
         const canvasContainer = document.getElementById("canvasContainer");
         const loadingText = document.getElementById("loadingText");
         const errorMsg = document.getElementById("errorMsg");
+        const legend = document.getElementById("legend");
 
         const uploadBtn = document.getElementById("uploadBtn");
         const fileInput = document.getElementById("fileInput");
@@ -292,24 +339,25 @@
         const resetBtn = document.getElementById("resetBtn");
         const toggleSkeletonBtn = document.getElementById("toggleSkeletonBtn");
         const toggleWristTraceBtn = document.getElementById("toggleWristTraceBtn");
-        const toggleSmoothBtn = document.getElementById("toggleSmoothBtn");
         const toggleBlackBgBtn = document.getElementById("toggleBlackBgBtn");
+        const recordBtn = document.getElementById("recordBtn");
 
         const statusPlayback = document.getElementById("statusPlayback");
         const statusModel = document.getElementById("statusModel");
         const statusSkeletonShow = document.getElementById("statusSkeletonShow");
         const statusWristTrace = document.getElementById("statusWristTrace");
-        const statusSmooth = document.getElementById("statusSmooth");
+        const statusThrowCount = document.getElementById("statusThrowCount");
         const statusBlackBg = document.getElementById("statusBlackBg");
         const statusFPS = document.getElementById("statusFPS");
+        const statusRecording = document.getElementById("statusRecording");
 
         // === MediaPipe / 偵測相關 ===
-        let poseLandmarker = null;     // MediaPipe Pose 模型實例
-        let modelReady = false;        // 模型是否載入完成
+        let poseLandmarker = null;
+        let modelReady = false;
 
         // 檢測迴圈控制
         let detecting = false;
-        const hasRVFC = "requestVideoFrameCallback" in HTMLVideoElement.prototype; // 是否支援 requestVideoFrameCallback
+        const hasRVFC = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
         let rvfcId = null;
         let rafId = null;
 
@@ -328,15 +376,12 @@
         const MIN_VISIBILITY_DRAW = 0.35;
         const MIN_VISIBILITY_TRACE = 0.5;
 
-        // 單次偵測間，關鍵點在正規化座標中不可能超過的位移量。
-        // 超過就視為誤判（例如手臂被遮擋時模型把點甩到別的位置），直接沿用前一次的值。
+        // 單次偵測間，關鍵點在正規化座標中不可能超過的位移量（超過視為誤判）
         const MAX_JUMP_PER_DETECT = 0.22;
-        const MAX_CONSECUTIVE_REJECTS = 3; // 連續拒絕太多次就接受新值，避免永久卡住
+        const MAX_CONSECUTIVE_REJECTS = 3;
 
-        // === 平滑濾波：中位數去尖刺 + One Euro Filter 時間平滑 ===
-        let smoothingEnabled = true;
-
-        const MEDIAN_WINDOW = 5; // 5 幀中位數，可完全吃掉連續兩幀的誤判尖刺
+        // === 平滑濾波：中位數去尖刺 + One Euro Filter 時間平滑（固定啟用） ===
+        const MEDIAN_WINDOW = 5;
         const rawHistoryX = new Map();
         const rawHistoryY = new Map();
 
@@ -356,11 +401,10 @@
             if (hx.length > MEDIAN_WINDOW) hx.shift();
             if (hy.length > MEDIAN_WINDOW) hy.shift();
 
-            if (hx.length < 3) return { x, y }; // 剛開始資料不足，先照原值
+            if (hx.length < 3) return { x, y };
             return { x: medianOf(hx), y: medianOf(hy) };
         }
 
-        // One Euro Filter：beta 越小 → 快速移動時仍維持強平滑（抖動少、略有延遲）
         function makeFilterParams(idx) {
             if (FAST_LIMB_INDICES.has(idx)) {
                 // 手肘/手腕：偵測雜訊最大，用最強的平滑設定
@@ -390,7 +434,7 @@
                     this.dxPrev = 0;
                     return x;
                 }
-                const dt = Math.max((t - this.tPrev) / 1000, 1 / 240); // 秒，避免除以 0
+                const dt = Math.max((t - this.tPrev) / 1000, 1 / 240);
                 this.tPrev = t;
 
                 const dx = (x - this.xPrev) / dt;
@@ -420,8 +464,8 @@
         }
 
         // 離群點拒絕用的前次可信位置
-        const lastAcceptedPoint = new Map(); // idx -> {x, y}
-        const rejectCount = new Map();       // idx -> 連續拒絕次數
+        const lastAcceptedPoint = new Map();
+        const rejectCount = new Map();
 
         function resetSmoothing() {
             landmarkFiltersX.clear();
@@ -432,7 +476,6 @@
             rejectCount.clear();
         }
 
-        // 離群值拒絕：位移超過物理上限就沿用前值
         function rejectOutlier(idx, x, y) {
             const prev = lastAcceptedPoint.get(idx);
             if (!prev) {
@@ -445,7 +488,7 @@
 
             if (dist > MAX_JUMP_PER_DETECT && rejects < MAX_CONSECUTIVE_REJECTS) {
                 rejectCount.set(idx, rejects + 1);
-                return prev; // 判定為誤判，沿用上一個可信位置
+                return prev;
             }
             rejectCount.set(idx, 0);
             lastAcceptedPoint.set(idx, { x, y });
@@ -453,7 +496,6 @@
         }
 
         function smoothLandmarks(landmarks, t) {
-            if (!smoothingEnabled) return landmarks;
             return landmarks.map((lm, i) => {
                 if (!lm) return lm;
                 const cleaned = rejectOutlier(i, lm.x, lm.y);
@@ -469,19 +511,200 @@
             });
         }
 
-        // === 手腕軌跡相關 ===
+        // === 手腕軌跡：分段記錄，每次舉手換一個顏色 ===
         let wristTraceEnabled = false;
-        const leftWristTrace = [];
-        const rightWristTrace = [];
-        const MAX_TRACE_POINTS = 120;
-        // 兩個軌跡點至少要相距這麼遠才記錄，避免靜止時原地堆疊大量重複點
-        const MIN_TRACE_SPACING = 0.004;
+
+        // 每一段代表一次投擲，顏色依序循環，方便比對前後幾次的軌跡落差
+        const SEGMENT_COLORS = [
+            "255,80,80",    // 紅
+            "80,210,255",   // 青
+            "255,215,70",   // 黃
+            "120,245,140",  // 綠
+            "255,140,240",  // 粉紫
+            "255,165,60",   // 橘
+            "160,175,255",  // 藍紫
+            "110,255,215"   // 藍綠
+        ];
+
+        const MAX_SEGMENTS = 12;          // 最多保留幾次投擲的軌跡
+        const MAX_POINTS_PER_SEGMENT = 800;
+        const MIN_TRACE_SPACING = 0.004;  // 幾乎沒動就不重複記錄
+
+        // 舉手判定：手腕連續向上累積的位移超過此值，視為新一次投擲開始
+        const UP_TRIGGER_DISTANCE = 0.035;
+        const DOWN_RESET_DISTANCE = 0.015; // 向下移動超過此值就重置累積量
+        const MIN_SEGMENT_INTERVAL_MS = 600; // 兩次換色的最短間隔，避免小抖動狂換色
+
+        function createTraceState() {
+            return {
+                segments: [],      // [{ color, points: [{x,y}] }]
+                upAccum: 0,        // 連續向上移動的累積量
+                downAccum: 0,
+                lastY: null,
+                lastSegmentTime: 0,
+                throwCount: 0
+            };
+        }
+
+        const traceStates = {
+            left: createTraceState(),
+            right: createTraceState()
+        };
+
+        function clearWristTrace() {
+            traceStates.left = createTraceState();
+            traceStates.right = createTraceState();
+            updateThrowStatus();
+            renderLegend();
+        }
+
+        function startNewSegment(state) {
+            state.throwCount += 1;
+            const color = SEGMENT_COLORS[(state.throwCount - 1) % SEGMENT_COLORS.length];
+            state.segments.push({ color, points: [], index: state.throwCount });
+            if (state.segments.length > MAX_SEGMENTS) state.segments.shift();
+        }
+
+        // 依手腕垂直移動方向判斷是否為新的一次投擲（手往上舉 → 換色開新段）
+        function updateTraceSegmentation(state, y, now) {
+            if (state.lastY === null) {
+                state.lastY = y;
+                return;
+            }
+            const dy = y - state.lastY; // y 往下為正，所以 dy < 0 代表手往上
+            state.lastY = y;
+
+            if (dy < 0) {
+                state.upAccum += -dy;
+                state.downAccum = 0;
+            } else {
+                state.downAccum += dy;
+                if (state.downAccum > DOWN_RESET_DISTANCE) {
+                    state.upAccum = 0;
+                }
+            }
+
+            const enoughTime = now - state.lastSegmentTime > MIN_SEGMENT_INTERVAL_MS;
+            if (state.upAccum >= UP_TRIGGER_DISTANCE && enoughTime) {
+                startNewSegment(state);
+                state.lastSegmentTime = now;
+                state.upAccum = 0;
+                updateThrowStatus();
+                renderLegend();
+            }
+        }
+
+        function pushTracePoint(state, lm, now) {
+            if (!lm) return;
+            if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
+
+            updateTraceSegmentation(state, lm.y, now);
+
+            if (state.segments.length === 0) {
+                startNewSegment(state);
+                state.lastSegmentTime = now;
+                updateThrowStatus();
+                renderLegend();
+            }
+
+            const seg = state.segments[state.segments.length - 1];
+            const last = seg.points[seg.points.length - 1];
+            if (last) {
+                const d = Math.hypot(lm.x - last.x, lm.y - last.y);
+                if (d < MIN_TRACE_SPACING) return;
+            }
+            seg.points.push({ x: lm.x, y: lm.y });
+            if (seg.points.length > MAX_POINTS_PER_SEGMENT) seg.points.shift();
+        }
+
+        function updateWristTrace(landmarks, now) {
+            if (!landmarks || !Array.isArray(landmarks)) return;
+            pushTracePoint(traceStates.left, landmarks[LEFT_WRIST], now);
+            pushTracePoint(traceStates.right, landmarks[RIGHT_WRIST], now);
+        }
+
+        // 畫所有軌跡段：整段維持同一個顏色與粗細，不淡出、不消失
+        function drawWristTrace() {
+            for (const key of ["left", "right"]) {
+                for (const seg of traceStates[key].segments) {
+                    drawSegment(seg);
+                }
+            }
+        }
+
+        function drawSegment(seg) {
+            const pts = seg.points;
+            if (pts.length < 2) return;
+
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = `rgba(${seg.color},0.9)`;
+            ctx.lineWidth = 4;
+
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
+
+            if (pts.length === 2) {
+                ctx.lineTo(pts[1].x * canvas.width, pts[1].y * canvas.height);
+            } else {
+                // 以相鄰點中點為節點的二次貝茲曲線，讓折線變滑順
+                for (let i = 1; i < pts.length - 1; i++) {
+                    const curX = pts[i].x * canvas.width;
+                    const curY = pts[i].y * canvas.height;
+                    const midX = (curX + pts[i + 1].x * canvas.width) / 2;
+                    const midY = (curY + pts[i + 1].y * canvas.height) / 2;
+                    ctx.quadraticCurveTo(curX, curY, midX, midY);
+                }
+                const last = pts[pts.length - 1];
+                ctx.lineTo(last.x * canvas.width, last.y * canvas.height);
+            }
+            ctx.stroke();
+
+            // 在每段起點標上投擲編號，方便和圖例對照
+            const start = pts[0];
+            const sx = start.x * canvas.width;
+            const sy = start.y * canvas.height;
+            ctx.fillStyle = `rgba(${seg.color},0.95)`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#0b1020";
+            ctx.font = "bold 13px 'Segoe UI', Arial, sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(seg.index), sx, sy + 1);
+        }
+
+        function updateThrowStatus() {
+            const total = Math.max(traceStates.left.throwCount, traceStates.right.throwCount);
+            statusThrowCount.textContent = total + " 次";
+        }
+
+        // 圖例：列出目前畫面上每一段軌跡的顏色與編號
+        function renderLegend() {
+            const segs = traceStates.right.segments.length >= traceStates.left.segments.length
+                ? traceStates.right.segments
+                : traceStates.left.segments;
+
+            if (!wristTraceEnabled || segs.length === 0) {
+                legend.classList.remove("show");
+                legend.innerHTML = "";
+                return;
+            }
+            legend.classList.add("show");
+            legend.innerHTML = segs
+                .map(
+                    (s) =>
+                        `<span class="legend-item"><span class="legend-swatch" style="background:rgb(${s.color})"></span>第 ${s.index} 次</span>`
+                )
+                .join("");
+        }
 
         // === FPS 計算相關 ===
         const frameTimes = [];
         let lastFPSUpdate = 0;
 
-        let lastLandmarks = null; // 最近一次偵測到（並已平滑）的骨架點
+        let lastLandmarks = null;
 
         // === 共用 UI 函式 ===
         function showError(msg) {
@@ -507,8 +730,7 @@
                 );
                 poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        // full 模型：手臂快速揮動時的關鍵點精度明顯優於 lite，
-                        // 是減少「手臂點亂跳」最直接的一步
+                        // full 模型：手臂快速揮動時的關鍵點精度明顯優於 lite
                         modelAssetPath:
                             "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
                         delegate: "GPU"
@@ -606,89 +828,27 @@
             }
 
             if (!poseLandmarker || !modelReady) return;
-            if (!skeletonEnabled) return;
+            if (!skeletonEnabled) {
+                // 骨架關閉時仍然把已記錄的軌跡畫出來
+                if (wristTraceEnabled) drawWristTrace();
+                return;
+            }
 
             try {
-                // 2. 每個新影片幀都做一次偵測。
-                //    先前版本用固定毫秒節流，會讓偵測慢於畫面更新，
-                //    中間的幀重複套用舊座標 → 手臂快速移動時就是「停一下、跳一格」的階梯感。
+                // 2. 每個新影片幀都做一次偵測，避免節流造成的階梯式跳動
                 const result = poseLandmarker.detectForVideo(video, now);
                 if (result.landmarks && result.landmarks.length > 0) {
                     lastLandmarks = smoothLandmarks(result.landmarks[0], now);
-                    // 3. 軌跡只在拿到新偵測結果時累積（不再每個繪製幀重複 push 同一點）
+                    // 3. 軌跡只在拿到新偵測結果時累積
                     if (wristTraceEnabled) {
-                        updateWristTrace(lastLandmarks);
+                        updateWristTrace(lastLandmarks, now);
                     }
                 }
 
-                if (lastLandmarks) {
-                    if (wristTraceEnabled) drawWristTrace();
-                    drawSkeleton(lastLandmarks);
-                }
+                if (wristTraceEnabled) drawWristTrace();
+                if (lastLandmarks) drawSkeleton(lastLandmarks);
             } catch (e) {
                 console.error("detectForVideo 錯誤:", e);
-            }
-        }
-
-        // 更新手腕軌跡：只收可信度足夠、且與前一點有足夠間距的點
-        function updateWristTrace(landmarks) {
-            if (!landmarks || !Array.isArray(landmarks)) return;
-            pushTracePoint(leftWristTrace, landmarks[LEFT_WRIST]);
-            pushTracePoint(rightWristTrace, landmarks[RIGHT_WRIST]);
-        }
-
-        function pushTracePoint(trace, lm) {
-            if (!lm) return;
-            if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
-
-            const last = trace[trace.length - 1];
-            if (last) {
-                const d = Math.hypot(lm.x - last.x, lm.y - last.y);
-                if (d < MIN_TRACE_SPACING) return; // 幾乎沒動，不重複記錄
-            }
-            trace.push({ x: lm.x, y: lm.y });
-            if (trace.length > MAX_TRACE_POINTS) trace.shift();
-        }
-
-        function clearWristTrace() {
-            leftWristTrace.length = 0;
-            rightWristTrace.length = 0;
-        }
-
-        // 畫手腕軌跡：以中點做控制點的平滑曲線，越舊越淡
-        function drawWristTrace() {
-            drawFadingTrace(leftWristTrace, "0,200,255");
-            drawFadingTrace(rightWristTrace, "255,70,70");
-        }
-
-        function drawFadingTrace(points, rgb) {
-            if (points.length < 3) return;
-
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-
-            // 分段繪製，讓尾端逐漸淡出，看起來像流暢的拖尾
-            for (let i = 1; i < points.length - 1; i++) {
-                const t = i / (points.length - 1);
-                const cur = points[i];
-                const next = points[i + 1];
-
-                const curX = cur.x * canvas.width;
-                const curY = cur.y * canvas.height;
-                const nextX = next.x * canvas.width;
-                const nextY = next.y * canvas.height;
-                const prev = points[i - 1];
-                const prevMidX = (prev.x * canvas.width + curX) / 2;
-                const prevMidY = (prev.y * canvas.height + curY) / 2;
-                const midX = (curX + nextX) / 2;
-                const midY = (curY + nextY) / 2;
-
-                ctx.beginPath();
-                ctx.strokeStyle = `rgba(${rgb},${(0.15 + 0.75 * t).toFixed(3)})`;
-                ctx.lineWidth = 2 + 4 * t;
-                ctx.moveTo(prevMidX, prevMidY);
-                ctx.quadraticCurveTo(curX, curY, midX, midY);
-                ctx.stroke();
             }
         }
 
@@ -696,7 +856,6 @@
         function drawSkeleton(landmarks) {
             if (!landmarks || !Array.isArray(landmarks)) return;
 
-            // 骨架連接關係（不含手指）
             const connections = [
                 [11, 12], [11, 23], [12, 24], [23, 24],
                 [11, 13], [13, 15], [12, 14], [14, 16],
@@ -714,7 +873,7 @@
             for (const [s, e] of connections) {
                 const a = landmarks[s];
                 const b = landmarks[e];
-                if (!visible(a) || !visible(b)) continue; // 任一端不可信就不連線，避免亂拉線
+                if (!visible(a) || !visible(b)) continue;
                 ctx.beginPath();
                 ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
                 ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
@@ -742,6 +901,86 @@
             }
         }
 
+        // === 錄製：把 canvas 畫面（影片 + 骨架 + 軌跡）另存成影片檔 ===
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        function startRecording() {
+            if (isRecording) return;
+            try {
+                const stream = canvas.captureStream(30);
+
+                let selectedMimeType = "video/webm;codecs=vp9";
+                const supportedMimeTypes = [
+                    "video/mp4;codecs=avc1.42E01E",
+                    "video/mp4",
+                    "video/webm;codecs=vp9",
+                    "video/webm"
+                ];
+                for (const mimeType of supportedMimeTypes) {
+                    if (MediaRecorder.isTypeSupported(mimeType)) {
+                        selectedMimeType = mimeType;
+                        break;
+                    }
+                }
+
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: selectedMimeType,
+                    videoBitsPerSecond: 5000000
+                });
+            } catch (e) {
+                showError("錄製初始化失敗：" + e.message + "\n\n請改用最新版 Chrome / Edge。");
+                console.error(e);
+                return;
+            }
+
+            recordedChunks = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                if (!recordedChunks.length) return;
+                const mimeType = mediaRecorder.mimeType || "video/webm";
+                const fileExt = mimeType.includes("mp4") ? "mp4" : "webm";
+
+                const blob = new Blob(recordedChunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "dart-trace-" + Date.now() + "." + fileExt;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            recordBtn.textContent = "停止錄製";
+            recordBtn.classList.add("recording");
+            statusRecording.textContent = "錄製中";
+        }
+
+        function stopRecording() {
+            if (!isRecording || !mediaRecorder) return;
+            try {
+                mediaRecorder.stop();
+            } catch (e) {
+                console.error("MediaRecorder 停止錯誤:", e);
+            }
+            isRecording = false;
+            recordBtn.textContent = "開始錄製";
+            recordBtn.classList.remove("recording");
+            statusRecording.textContent = "關";
+        }
+
+        function stopRecordingIfNeeded() {
+            if (isRecording) stopRecording();
+        }
+
         // === 檔案載入與影片事件 ===
         uploadBtn.addEventListener("click", () => {
             fileInput.click();
@@ -752,6 +991,7 @@
             if (!file) return;
 
             hideError();
+            stopRecordingIfNeeded();
             stopDetectLoop();
             video.pause();
             clearCanvas();
@@ -781,8 +1021,8 @@
             resetBtn.disabled = false;
             toggleSkeletonBtn.disabled = false;
             toggleWristTraceBtn.disabled = false;
-            toggleSmoothBtn.disabled = false;
             toggleBlackBgBtn.disabled = false;
+            recordBtn.disabled = false;
 
             video.currentTime = 0;
             clearCanvas();
@@ -802,6 +1042,7 @@
 
         video.addEventListener("ended", () => {
             stopDetectLoop();
+            stopRecordingIfNeeded();
             setPlaybackStatus("已結束");
         });
 
@@ -861,13 +1102,7 @@
             toggleWristTraceBtn.textContent = wristTraceEnabled ? "手腕軌跡：開" : "手腕軌跡：關";
             statusWristTrace.textContent = wristTraceEnabled ? "開" : "關";
             if (!wristTraceEnabled) clearWristTrace();
-        };
-
-        window.toggleSmoothing = function () {
-            smoothingEnabled = !smoothingEnabled;
-            resetSmoothing();
-            toggleSmoothBtn.textContent = smoothingEnabled ? "平滑：開" : "平滑：關";
-            statusSmooth.textContent = smoothingEnabled ? "開" : "關（原始座標，會明顯較抖）";
+            renderLegend();
         };
 
         window.toggleBlackBg = function () {
@@ -875,6 +1110,15 @@
             canvasContainer.classList.toggle("black-bg", blackBgEnabled);
             toggleBlackBgBtn.textContent = blackBgEnabled ? "背景：純黑" : "背景：影片";
             statusBlackBg.textContent = blackBgEnabled ? "純黑（只看點線軌跡）" : "影片";
+        };
+
+        window.toggleRecording = function () {
+            if (!video.src) {
+                showError("請先載入影片再錄製。");
+                return;
+            }
+            if (!isRecording) startRecording();
+            else stopRecording();
         };
 
         // 初始化 Pose 模型
