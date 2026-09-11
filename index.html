@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>飛鏢投擲骨架分析器（優化版）</title>
+    <title>飛鏢投擲骨架分析器</title>
     <style>
         * {
             margin: 0;
@@ -123,10 +123,10 @@
             color: #134e4a;
         }
 
-        /* 全螢幕：石板灰 */
-        .fullscreen-btn {
-            background: #cbd5e1;
-            color: #1e293b;
+        /* 純黑背景：深灰 */
+        .blackbg-btn {
+            background: #475569;
+            color: #f8fafc;
         }
 
         .control-btn:hover:not(:disabled) {
@@ -145,32 +145,15 @@
             display: none;
         }
 
-        /* 全螢幕時填滿螢幕、去除圓角，並讓影片維持比例置中 */
-        .canvas-container:fullscreen {
-            width: 100vw;
-            height: 100vh;
-            border-radius: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-        }
-
-        .canvas-container:fullscreen #videoElement,
-        .canvas-container:fullscreen #canvasElement {
-            width: auto;
-            height: 100%;
-            max-width: 100%;
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-        }
-
         #videoElement {
             width: 100%;
             height: auto;
             display: block;
+        }
+
+        /* 純黑背景模式時把原始 video 元素藏起來，只留 canvas 的繪製結果 */
+        .canvas-container.black-bg #videoElement {
+            visibility: hidden;
         }
 
         #canvasElement {
@@ -229,7 +212,7 @@
 <body>
     <div class="container">
         <h1>飛鏢投擲骨架分析器</h1>
-        <div class="subtitle">優化版：平滑濾波 + 全螢幕播放</div>
+        <div class="subtitle">穩定追蹤版：去尖刺濾波 + 離群點拒絕</div>
 
         <!-- 控制區：RWD -->
         <div class="controls" id="controls">
@@ -244,7 +227,7 @@
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：關</button>
             <button class="control-btn smooth-btn" id="toggleSmoothBtn" onclick="toggleSmoothing()" disabled>平滑：開</button>
-            <button class="control-btn fullscreen-btn" id="fullscreenBtn" onclick="toggleFullscreen()" disabled>全螢幕</button>
+            <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -280,6 +263,10 @@
                 <span class="info-value" id="statusSmooth">開</span>
             </div>
             <div class="info-row">
+                <span class="info-label">背景模式：</span>
+                <span class="info-value" id="statusBlackBg">影片</span>
+            </div>
+            <div class="info-row">
                 <span class="info-label">目前幀率：</span>
                 <span class="info-value" id="statusFPS">-- FPS</span>
             </div>
@@ -306,13 +293,14 @@
         const toggleSkeletonBtn = document.getElementById("toggleSkeletonBtn");
         const toggleWristTraceBtn = document.getElementById("toggleWristTraceBtn");
         const toggleSmoothBtn = document.getElementById("toggleSmoothBtn");
-        const fullscreenBtn = document.getElementById("fullscreenBtn");
+        const toggleBlackBgBtn = document.getElementById("toggleBlackBgBtn");
 
         const statusPlayback = document.getElementById("statusPlayback");
         const statusModel = document.getElementById("statusModel");
         const statusSkeletonShow = document.getElementById("statusSkeletonShow");
         const statusWristTrace = document.getElementById("statusWristTrace");
         const statusSmooth = document.getElementById("statusSmooth");
+        const statusBlackBg = document.getElementById("statusBlackBg");
         const statusFPS = document.getElementById("statusFPS");
 
         // === MediaPipe / 偵測相關 ===
@@ -325,23 +313,36 @@
         let rvfcId = null;
         let rafId = null;
 
-        // 骨架顯示與影片來源
+        // 顯示開關與影片來源
         let skeletonEnabled = true;
+        let blackBgEnabled = false;
         let currentObjectUrl = null;
 
-        // === 平滑濾波：中位數去尖刺 + One Euro Filter 平滑 ===
-        // 手臂/手腕移動快、常有動作模糊，MediaPipe 偵測容易「單幀跳點」（誤判位置），
-        // 純 One Euro Filter 對這種瞬間離群值效果有限（因為它會判斷成「快速移動」而放寬濾波）。
-        // 解法：先用最近 3 幀做中位數濾波去除離群跳點，再用 One Euro Filter 做時間平滑。
+        // MediaPipe Pose 關鍵點索引
+        const LEFT_WRIST = 15;
+        const RIGHT_WRIST = 16;
+        // 手臂關鍵點（手肘、手腕）移動最快、偵測最不穩，需要較強的濾波
+        const FAST_LIMB_INDICES = new Set([13, 14, 15, 16]);
+
+        // 低於此可信度的關鍵點視為不可靠，不繪製也不納入軌跡
+        const MIN_VISIBILITY_DRAW = 0.35;
+        const MIN_VISIBILITY_TRACE = 0.5;
+
+        // 單次偵測間，關鍵點在正規化座標中不可能超過的位移量。
+        // 超過就視為誤判（例如手臂被遮擋時模型把點甩到別的位置），直接沿用前一次的值。
+        const MAX_JUMP_PER_DETECT = 0.22;
+        const MAX_CONSECUTIVE_REJECTS = 3; // 連續拒絕太多次就接受新值，避免永久卡住
+
+        // === 平滑濾波：中位數去尖刺 + One Euro Filter 時間平滑 ===
         let smoothingEnabled = true;
 
-        // 中位數濾波參數
-        const MEDIAN_WINDOW = 3;
-        const rawHistoryX = new Map(); // idx -> [x0, x1, x2]
+        const MEDIAN_WINDOW = 5; // 5 幀中位數，可完全吃掉連續兩幀的誤判尖刺
+        const rawHistoryX = new Map();
         const rawHistoryY = new Map();
 
-        function median3(a, b, c) {
-            return Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
+        function medianOf(arr) {
+            const s = [...arr].sort((a, b) => a - b);
+            return s[Math.floor(s.length / 2)];
         }
 
         function medianFilterPoint(idx, x, y) {
@@ -355,20 +356,18 @@
             if (hx.length > MEDIAN_WINDOW) hx.shift();
             if (hy.length > MEDIAN_WINDOW) hy.shift();
 
-            if (hx.length < MEDIAN_WINDOW) {
-                return { x, y }; // 資料不足時先照原值，避免啟動延遲
-            }
-            return {
-                x: median3(hx[0], hx[1], hx[2]),
-                y: median3(hy[0], hy[1], hy[2])
-            };
+            if (hx.length < 3) return { x, y }; // 剛開始資料不足，先照原值
+            return { x: medianOf(hx), y: medianOf(hy) };
         }
 
-        // One Euro Filter：beta 調低 → 動作快時仍保持較強平滑，減少手臂抖動；
-        // minCutoff 調低 → 靜止/慢動作時更穩定，不跟著雜訊微微晃動。
-        const ONE_EURO_MIN_CUTOFF = 0.6;
-        const ONE_EURO_BETA = 0.15;
-        const ONE_EURO_D_CUTOFF = 1.0;
+        // One Euro Filter：beta 越小 → 快速移動時仍維持強平滑（抖動少、略有延遲）
+        function makeFilterParams(idx) {
+            if (FAST_LIMB_INDICES.has(idx)) {
+                // 手肘/手腕：偵測雜訊最大，用最強的平滑設定
+                return { minCutoff: 0.35, beta: 0.05, dCutoff: 1.0 };
+            }
+            return { minCutoff: 0.8, beta: 0.2, dCutoff: 1.0 };
+        }
 
         function lowPassAlpha(cutoff, dt) {
             const tau = 1.0 / (2 * Math.PI * cutoff);
@@ -376,7 +375,7 @@
         }
 
         class OneEuroFilter1D {
-            constructor(minCutoff = ONE_EURO_MIN_CUTOFF, beta = ONE_EURO_BETA, dCutoff = ONE_EURO_D_CUTOFF) {
+            constructor({ minCutoff, beta, dCutoff }) {
                 this.minCutoff = minCutoff;
                 this.beta = beta;
                 this.dCutoff = dCutoff;
@@ -391,7 +390,7 @@
                     this.dxPrev = 0;
                     return x;
                 }
-                const dt = Math.max((t - this.tPrev) / 1000, 1 / 120); // 秒，避免除以 0
+                const dt = Math.max((t - this.tPrev) / 1000, 1 / 240); // 秒，避免除以 0
                 this.tPrev = t;
 
                 const dx = (x - this.xPrev) / dt;
@@ -408,36 +407,62 @@
             }
         }
 
-        // 每個關鍵點各自一組 x/y 濾波器（延遲建立）
         const landmarkFiltersX = new Map();
         const landmarkFiltersY = new Map();
 
         function getFilter(map, idx) {
             let f = map.get(idx);
             if (!f) {
-                f = new OneEuroFilter1D();
+                f = new OneEuroFilter1D(makeFilterParams(idx));
                 map.set(idx, f);
             }
             return f;
         }
+
+        // 離群點拒絕用的前次可信位置
+        const lastAcceptedPoint = new Map(); // idx -> {x, y}
+        const rejectCount = new Map();       // idx -> 連續拒絕次數
 
         function resetSmoothing() {
             landmarkFiltersX.clear();
             landmarkFiltersY.clear();
             rawHistoryX.clear();
             rawHistoryY.clear();
+            lastAcceptedPoint.clear();
+            rejectCount.clear();
+        }
+
+        // 離群值拒絕：位移超過物理上限就沿用前值
+        function rejectOutlier(idx, x, y) {
+            const prev = lastAcceptedPoint.get(idx);
+            if (!prev) {
+                lastAcceptedPoint.set(idx, { x, y });
+                rejectCount.set(idx, 0);
+                return { x, y };
+            }
+            const dist = Math.hypot(x - prev.x, y - prev.y);
+            const rejects = rejectCount.get(idx) || 0;
+
+            if (dist > MAX_JUMP_PER_DETECT && rejects < MAX_CONSECUTIVE_REJECTS) {
+                rejectCount.set(idx, rejects + 1);
+                return prev; // 判定為誤判，沿用上一個可信位置
+            }
+            rejectCount.set(idx, 0);
+            lastAcceptedPoint.set(idx, { x, y });
+            return { x, y };
         }
 
         function smoothLandmarks(landmarks, t) {
             if (!smoothingEnabled) return landmarks;
             return landmarks.map((lm, i) => {
                 if (!lm) return lm;
-                const { x: mx, y: my } = medianFilterPoint(i, lm.x, lm.y);
+                const cleaned = rejectOutlier(i, lm.x, lm.y);
+                const med = medianFilterPoint(i, cleaned.x, cleaned.y);
                 const fx = getFilter(landmarkFiltersX, i);
                 const fy = getFilter(landmarkFiltersY, i);
                 return {
-                    x: fx.filter(mx, t),
-                    y: fy.filter(my, t),
+                    x: fx.filter(med.x, t),
+                    y: fy.filter(med.y, t),
                     z: lm.z,
                     visibility: lm.visibility
                 };
@@ -446,18 +471,17 @@
 
         // === 手腕軌跡相關 ===
         let wristTraceEnabled = false;
-        const leftWristTrace = [];   // 左手腕軌跡點
-        const rightWristTrace = [];  // 右手腕軌跡點
-        const MAX_TRACE_POINTS = 200; // 最多保留的軌跡點數
+        const leftWristTrace = [];
+        const rightWristTrace = [];
+        const MAX_TRACE_POINTS = 120;
+        // 兩個軌跡點至少要相距這麼遠才記錄，避免靜止時原地堆疊大量重複點
+        const MIN_TRACE_SPACING = 0.004;
 
         // === FPS 計算相關 ===
-        const frameTimes = [];    // 紀錄最近 1 秒內每幀時間
-        let lastFPSUpdate = 0;    // 上次更新 FPS 顯示的時間
+        const frameTimes = [];
+        let lastFPSUpdate = 0;
 
-        // 偵測節流時間（毫秒）：越大 → 偵測越少、越順；越小 → 偵測越頻繁、越吃資源
-        const DETECT_INTERVAL_MS = 40; // 約 ~25 FPS 偵測，動作較快時追蹤更緊
-        let lastDetectTime = 0;
-        let lastLandmarks = null; // 最近一次偵測到（並已平滑）的骨架點，用來在未偵測幀重畫
+        let lastLandmarks = null; // 最近一次偵測到（並已平滑）的骨架點
 
         // === 共用 UI 函式 ===
         function showError(msg) {
@@ -474,31 +498,30 @@
             statusPlayback.textContent = text;
         }
 
-        function setModelStatusLoaded() {
-            statusModel.textContent = "已載入";
-        }
-
         // === 初始化 MediaPipe Pose 模型 ===
         async function initPoseLandmarker() {
             loadingText.style.display = "block";
             try {
-                // 載入 WebAssembly 與相關資源
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
                 );
-                // 建立 PoseLandmarker 實例
                 poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
                     baseOptions: {
+                        // full 模型：手臂快速揮動時的關鍵點精度明顯優於 lite，
+                        // 是減少「手臂點亂跳」最直接的一步
                         modelAssetPath:
-                            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+                            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
                         delegate: "GPU"
                     },
                     runningMode: "VIDEO",
-                    numPoses: 1
+                    numPoses: 1,
+                    minPoseDetectionConfidence: 0.6,
+                    minPosePresenceConfidence: 0.6,
+                    minTrackingConfidence: 0.6
                 });
                 modelReady = true;
                 loadingText.style.display = "none";
-                setModelStatusLoaded();
+                statusModel.textContent = "已載入 (full)";
             } catch (e) {
                 loadingText.style.display = "none";
                 showError("MediaPipe 初始化失敗：" + e.message);
@@ -506,13 +529,11 @@
             }
         }
 
-        // 清空畫布
         function clearCanvas() {
             if (!canvas.width || !canvas.height) return;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        // 停止偵測迴圈
         function stopDetectLoop() {
             detecting = false;
             if (rvfcId !== null && typeof video.cancelVideoFrameCallback === "function") {
@@ -525,7 +546,6 @@
             rafId = null;
         }
 
-        // 啟動偵測迴圈（依瀏覽器支援選擇 RVFC 或 RAF）
         function startDetectLoop() {
             if (detecting) return;
             if (video.paused || video.ended) return;
@@ -537,7 +557,6 @@
             }
         }
 
-        // 使用 requestVideoFrameCallback 的迴圈
         function onVideoFrame() {
             processFrame();
             if (detecting && !video.paused && !video.ended) {
@@ -547,7 +566,6 @@
             }
         }
 
-        // 使用 requestAnimationFrame 的迴圈
         function onAnimationFrame() {
             processFrame();
             if (detecting && !video.paused && !video.ended) {
@@ -557,134 +575,121 @@
             }
         }
 
-        // 更新 FPS 顯示（計算每秒幀數）
         function updateFPS(now) {
             frameTimes.push(now);
-            // 移除超過 1 秒的舊時間戳
             while (frameTimes.length && frameTimes[0] <= now - 1000) {
                 frameTimes.shift();
             }
             const fps = frameTimes.length;
-            // 每 0.2 秒更新一次畫面上的數字
             if (now - lastFPSUpdate > 200) {
                 statusFPS.textContent = fps.toFixed(0) + " FPS";
                 lastFPSUpdate = now;
             }
         }
 
-        // 單幀處理：畫影片 +（必要時）做骨架偵測 + 重畫骨架
+        // 單幀處理：畫背景 + 骨架偵測 + 繪製
         function processFrame() {
             const now = performance.now();
-
-            // 1. 更新 FPS
             updateFPS(now);
 
-            // 2. 先把目前影片畫到畫布
-            try {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            } catch (e) {
-                // 影片剛開始可能尚無 frame，這裡忽略錯誤
+            // 1. 畫背景：影片畫面，或純黑
+            if (blackBgEnabled) {
+                ctx.fillStyle = "#000000";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                try {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                } catch (e) {
+                    // 影片剛開始可能尚無 frame
+                }
             }
 
-            // 模型未載入或沒開骨架時就只顯示影片
             if (!poseLandmarker || !modelReady) return;
             if (!skeletonEnabled) return;
 
             try {
-                // 3. 節流骨架偵測：間隔時間到了才呼叫 detectForVideo
-                if (now - lastDetectTime >= DETECT_INTERVAL_MS) {
-                    lastDetectTime = now;
-                    const result = poseLandmarker.detectForVideo(video, now);
-                    if (result.landmarks && result.landmarks.length > 0) {
-                        // 每幀都先做平滑（去尖刺 + 時間平滑），再存起來給繪製 / 軌跡使用
-                        lastLandmarks = smoothLandmarks(result.landmarks[0], now);
+                // 2. 每個新影片幀都做一次偵測。
+                //    先前版本用固定毫秒節流，會讓偵測慢於畫面更新，
+                //    中間的幀重複套用舊座標 → 手臂快速移動時就是「停一下、跳一格」的階梯感。
+                const result = poseLandmarker.detectForVideo(video, now);
+                if (result.landmarks && result.landmarks.length > 0) {
+                    lastLandmarks = smoothLandmarks(result.landmarks[0], now);
+                    // 3. 軌跡只在拿到新偵測結果時累積（不再每個繪製幀重複 push 同一點）
+                    if (wristTraceEnabled) {
+                        updateWristTrace(lastLandmarks);
                     }
                 }
 
-                // 4. 如果有最近一次的骨架結果，就畫在影片上
                 if (lastLandmarks) {
+                    if (wristTraceEnabled) drawWristTrace();
                     drawSkeleton(lastLandmarks);
-                    if (wristTraceEnabled) {
-                        updateWristTrace(lastLandmarks);
-                        drawWristTrace();
-                    }
                 }
             } catch (e) {
                 console.error("detectForVideo 錯誤:", e);
             }
         }
 
-        // 畫手腕軌跡（用二次貝茲曲線平滑連接，視覺上比純折線更順）
-        function drawWristTrace() {
-            if (!wristTraceEnabled) return;
+        // 更新手腕軌跡：只收可信度足夠、且與前一點有足夠間距的點
+        function updateWristTrace(landmarks) {
+            if (!landmarks || !Array.isArray(landmarks)) return;
+            pushTracePoint(leftWristTrace, landmarks[LEFT_WRIST]);
+            pushTracePoint(rightWristTrace, landmarks[RIGHT_WRIST]);
+        }
 
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = "rgba(255,60,60,0.85)";
+        function pushTracePoint(trace, lm) {
+            if (!lm) return;
+            if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
+
+            const last = trace[trace.length - 1];
+            if (last) {
+                const d = Math.hypot(lm.x - last.x, lm.y - last.y);
+                if (d < MIN_TRACE_SPACING) return; // 幾乎沒動，不重複記錄
+            }
+            trace.push({ x: lm.x, y: lm.y });
+            if (trace.length > MAX_TRACE_POINTS) trace.shift();
+        }
+
+        function clearWristTrace() {
+            leftWristTrace.length = 0;
+            rightWristTrace.length = 0;
+        }
+
+        // 畫手腕軌跡：以中點做控制點的平滑曲線，越舊越淡
+        function drawWristTrace() {
+            drawFadingTrace(leftWristTrace, "0,200,255");
+            drawFadingTrace(rightWristTrace, "255,70,70");
+        }
+
+        function drawFadingTrace(points, rgb) {
+            if (points.length < 3) return;
+
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
 
-            drawSmoothPolyline(leftWristTrace);
-            drawSmoothPolyline(rightWristTrace);
-        }
-
-        // 用相鄰點中點作為控制點，畫出平滑曲線
-        function drawSmoothPolyline(points) {
-            if (points.length < 2) return;
-            ctx.beginPath();
-            const p0 = points[0];
-            ctx.moveTo(p0.x * canvas.width, p0.y * canvas.height);
-
-            if (points.length === 2) {
-                const p1 = points[1];
-                ctx.lineTo(p1.x * canvas.width, p1.y * canvas.height);
-                ctx.stroke();
-                return;
-            }
-
+            // 分段繪製，讓尾端逐漸淡出，看起來像流暢的拖尾
             for (let i = 1; i < points.length - 1; i++) {
+                const t = i / (points.length - 1);
                 const cur = points[i];
                 const next = points[i + 1];
+
                 const curX = cur.x * canvas.width;
                 const curY = cur.y * canvas.height;
                 const nextX = next.x * canvas.width;
                 const nextY = next.y * canvas.height;
+                const prev = points[i - 1];
+                const prevMidX = (prev.x * canvas.width + curX) / 2;
+                const prevMidY = (prev.y * canvas.height + curY) / 2;
                 const midX = (curX + nextX) / 2;
                 const midY = (curY + nextY) / 2;
+
+                ctx.beginPath();
+                ctx.strokeStyle = `rgba(${rgb},${(0.15 + 0.75 * t).toFixed(3)})`;
+                ctx.lineWidth = 2 + 4 * t;
+                ctx.moveTo(prevMidX, prevMidY);
                 ctx.quadraticCurveTo(curX, curY, midX, midY);
+                ctx.stroke();
             }
-            const last = points[points.length - 1];
-            ctx.lineTo(last.x * canvas.width, last.y * canvas.height);
-            ctx.stroke();
-        }
-
-        // 更新手腕軌跡
-        function updateWristTrace(landmarks) {
-            if (!landmarks || !Array.isArray(landmarks)) return;
-
-            // 左手腕 (15) 與右手腕 (16)
-            const leftWrist = landmarks[15];
-            const rightWrist = landmarks[16];
-
-            if (leftWrist) {
-                leftWristTrace.push({ x: leftWrist.x, y: leftWrist.y });
-                if (leftWristTrace.length > MAX_TRACE_POINTS) {
-                    leftWristTrace.shift();
-                }
-            }
-
-            if (rightWrist) {
-                rightWristTrace.push({ x: rightWrist.x, y: rightWrist.y });
-                if (rightWristTrace.length > MAX_TRACE_POINTS) {
-                    rightWristTrace.shift();
-                }
-            }
-        }
-
-        // 清除手腕軌跡
-        function clearWristTrace() {
-            leftWristTrace.length = 0;
-            rightWristTrace.length = 0;
         }
 
         // 畫骨架線段與節點
@@ -693,54 +698,42 @@
 
             // 骨架連接關係（不含手指）
             const connections = [
-                [11, 12],
-                [11, 23],
-                [12, 24],
-                [23, 24],
-                [11, 13],
-                [13, 15],
-                [12, 14],
-                [14, 16],
-                [23, 25],
-                [25, 27],
-                [27, 29],
-                [29, 31],
-                [24, 26],
-                [26, 28],
-                [28, 30],
-                [30, 32]
+                [11, 12], [11, 23], [12, 24], [23, 24],
+                [11, 13], [13, 15], [12, 14], [14, 16],
+                [23, 25], [25, 27], [27, 29], [29, 31],
+                [24, 26], [26, 28], [28, 30], [30, 32]
             ];
 
-            // 粗白線
+            const visible = (lm) =>
+                lm && (lm.visibility == null || lm.visibility >= MIN_VISIBILITY_DRAW);
+
             ctx.lineWidth = 4;
             ctx.strokeStyle = "rgba(255,255,255,0.9)";
+            ctx.lineCap = "round";
 
-            // 畫線段
             for (const [s, e] of connections) {
                 const a = landmarks[s];
                 const b = landmarks[e];
-                if (!a || !b) continue;
+                if (!visible(a) || !visible(b)) continue; // 任一端不可信就不連線，避免亂拉線
                 ctx.beginPath();
                 ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
                 ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
                 ctx.stroke();
             }
 
-            // 紅色節點（略過臉與手指）
             for (let i = 0; i < landmarks.length; i++) {
                 if (i <= 10) continue;            // 0–10 為頭部/臉部
                 if (i >= 17 && i <= 22) continue; // 17–22 為手指節點
                 const lm = landmarks[i];
-                if (!lm) continue;
+                if (!visible(lm)) continue;
 
                 const x = lm.x * canvas.width;
                 const y = lm.y * canvas.height;
-                const alpha = lm.visibility != null ? lm.visibility : 0.7;
-                const r = 7; // 節點半徑
+                const alpha = lm.visibility != null ? lm.visibility : 0.8;
 
                 ctx.beginPath();
                 ctx.fillStyle = `rgba(255,0,0,${alpha})`;
-                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.arc(x, y, 7, 0, Math.PI * 2);
                 ctx.fill();
 
                 ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
@@ -750,13 +743,10 @@
         }
 
         // === 檔案載入與影片事件 ===
-
-        // 點擊「選擇影片」→ 開啟檔案選擇
         uploadBtn.addEventListener("click", () => {
             fileInput.click();
         });
 
-        // 選擇影片後載入
         fileInput.addEventListener("change", (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -769,20 +759,17 @@
             resetSmoothing();
             lastLandmarks = null;
 
-            // 釋放上一支影片的 URL
             if (currentObjectUrl) {
                 URL.revokeObjectURL(currentObjectUrl);
                 currentObjectUrl = null;
             }
 
-            // 建立新影片 URL
             const url = URL.createObjectURL(file);
             currentObjectUrl = url;
             video.src = url;
             setPlaybackStatus("載入影片中…");
         });
 
-        // 影片 metadata 載入完成：設定畫布大小與啟用按鈕
         video.addEventListener("loadedmetadata", () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -795,34 +782,29 @@
             toggleSkeletonBtn.disabled = false;
             toggleWristTraceBtn.disabled = false;
             toggleSmoothBtn.disabled = false;
-            fullscreenBtn.disabled = false;
+            toggleBlackBgBtn.disabled = false;
 
             video.currentTime = 0;
             clearCanvas();
             setPlaybackStatus("待機");
         });
 
-        // 影片開始播放
         video.addEventListener("play", () => {
             hideError();
             setPlaybackStatus("播放中");
             startDetectLoop();
         });
 
-        // 影片暫停
         video.addEventListener("pause", () => {
             stopDetectLoop();
             if (!video.ended) setPlaybackStatus("已暫停");
         });
 
-        // 影片播完
         video.addEventListener("ended", () => {
             stopDetectLoop();
-            clearWristTrace();
             setPlaybackStatus("已結束");
         });
 
-        // 影片錯誤
         video.addEventListener("error", (e) => {
             const err = video.error;
             const msg = err
@@ -832,13 +814,7 @@
             console.error("影片錯誤:", e, err);
         });
 
-        // 全螢幕狀態改變時，同步更新按鈕文字
-        document.addEventListener("fullscreenchange", () => {
-            fullscreenBtn.textContent = document.fullscreenElement ? "退出全螢幕" : "全螢幕";
-        });
-
-        // === 提供給 HTML 按鈕呼叫的控制函式（window.xxx） ===
-
+        // === 提供給 HTML 按鈕呼叫的控制函式 ===
         window.playVideo = async function () {
             hideError();
             try {
@@ -873,51 +849,32 @@
 
         window.toggleSkeleton = function () {
             skeletonEnabled = !skeletonEnabled;
-            if (!skeletonEnabled) {
-                toggleSkeletonBtn.textContent = "骨架：關";
-                statusSkeletonShow.textContent = "關";
-                // 關閉骨架時，仍然畫影片但不畫骨架
-            } else {
-                toggleSkeletonBtn.textContent = "骨架：開";
-                statusSkeletonShow.textContent = "開";
-                if (!video.paused && !video.ended && !detecting) {
-                    startDetectLoop();
-                }
+            toggleSkeletonBtn.textContent = skeletonEnabled ? "骨架：開" : "骨架：關";
+            statusSkeletonShow.textContent = skeletonEnabled ? "開" : "關";
+            if (skeletonEnabled && !video.paused && !video.ended && !detecting) {
+                startDetectLoop();
             }
         };
 
         window.toggleWristTrace = function () {
             wristTraceEnabled = !wristTraceEnabled;
-            if (!wristTraceEnabled) {
-                toggleWristTraceBtn.textContent = "手腕軌跡：關";
-                statusWristTrace.textContent = "關";
-                clearWristTrace();
-            } else {
-                toggleWristTraceBtn.textContent = "手腕軌跡：開";
-                statusWristTrace.textContent = "開";
-            }
+            toggleWristTraceBtn.textContent = wristTraceEnabled ? "手腕軌跡：開" : "手腕軌跡：關";
+            statusWristTrace.textContent = wristTraceEnabled ? "開" : "關";
+            if (!wristTraceEnabled) clearWristTrace();
         };
 
         window.toggleSmoothing = function () {
             smoothingEnabled = !smoothingEnabled;
             resetSmoothing();
-            if (!smoothingEnabled) {
-                toggleSmoothBtn.textContent = "平滑：關";
-                statusSmooth.textContent = "關（原始座標，會明顯較抖）";
-            } else {
-                toggleSmoothBtn.textContent = "平滑：開";
-                statusSmooth.textContent = "開";
-            }
+            toggleSmoothBtn.textContent = smoothingEnabled ? "平滑：開" : "平滑：關";
+            statusSmooth.textContent = smoothingEnabled ? "開" : "關（原始座標，會明顯較抖）";
         };
 
-        window.toggleFullscreen = function () {
-            if (!document.fullscreenElement) {
-                canvasContainer.requestFullscreen().catch((e) => {
-                    showError("無法進入全螢幕：" + e.message);
-                });
-            } else {
-                document.exitFullscreen();
-            }
+        window.toggleBlackBg = function () {
+            blackBgEnabled = !blackBgEnabled;
+            canvasContainer.classList.toggle("black-bg", blackBgEnabled);
+            toggleBlackBgBtn.textContent = blackBgEnabled ? "背景：純黑" : "背景：影片";
+            statusBlackBg.textContent = blackBgEnabled ? "純黑（只看點線軌跡）" : "影片";
         };
 
         // 初始化 Pose 模型
