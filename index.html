@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.1　最後更新：2026-09-14 17:06
+  版本：v1.2　最後更新：2026-09-14 17:10
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -66,27 +66,49 @@
             letter-spacing: 0.5px;
         }
 
-        /* 按鈕區：RWD 網格 */
+        /* 按鈕區：手機 2 欄 → 平板 3 欄 → 桌機 5 欄（10 個按鈕剛好 2 排） */
         .controls {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 10px;
-            max-width: 820px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            max-width: 860px;
             margin: 8px auto 14px;
+        }
+
+        @media (min-width: 480px) {
+            .controls {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 10px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .controls {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
         }
 
         .control-btn {
             border: none;
             border-radius: 999px;
             cursor: pointer;
-            font-size: 14px;
-            padding: 10px 8px;
+            font-size: 13px;
+            padding: 11px 6px;
             text-align: center;
+            white-space: nowrap;
             transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
             box-shadow: 0 1px 4px rgba(15,23,42,0.15);
-            min-height: 38px;
+            min-height: 42px;
             background: #e5e7eb;
             color: #111827;
+        }
+
+        @media (min-width: 480px) {
+            .control-btn {
+                font-size: 14px;
+                padding: 10px 8px;
+                min-height: 38px;
+            }
         }
 
         .control-btn:disabled {
@@ -139,11 +161,6 @@
         .shoulder-trace-btn {
             background: #a5d8f3;
             color: #0c4a6e;
-        }
-
-        /* 最後一排只有兩個按鈕，各佔兩格才不會留空 */
-        .controls .wide {
-            grid-column: span 2;
         }
 
         /* 純黑背景：深灰 */
@@ -323,17 +340,18 @@
             </button>
             <input type="file" id="fileInput" accept="video/*" style="display:none;" />
 
+            <!-- 桌機為一排 5 個：這排是播放控制，錄製排在最右 -->
             <button class="control-btn play-btn" id="playBtn" onclick="playVideo()" disabled>播放</button>
             <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseVideo()" disabled>暫停</button>
+            <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
             <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
 
-            <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
+            <!-- 第二排：顯示與軌跡控制 -->
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：開</button>
-
-            <button class="control-btn head-trace-btn wide" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部軌跡：關</button>
-            <button class="control-btn shoulder-trace-btn wide" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀軌跡：關</button>
+            <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部軌跡：關</button>
+            <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀軌跡：關</button>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -401,7 +419,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.1　最後更新 2026-09-14 17:06</span><br />
+            <span class="version">版本 v1.2　最後更新 2026-09-14 17:10</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
