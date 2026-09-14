@@ -1,0 +1,15 @@
+# 尚未對外開放的頁面（要公開時，把下面兩行刪掉再 commit）
+privacy.html
+sponsor.html
+
+# 系統與編輯器產生的檔案
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# 測試用影片與輸出
+*.mp4
+*.webm
+*.mov
