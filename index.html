@@ -1,9 +1,25 @@
 <!DOCTYPE html>
+<!--
+  飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
+
+  版權所有 © 2026 hsinnan64. 保留一切權利。
+  Copyright © 2026 hsinnan64. All Rights Reserved.
+
+  未經著作權人書面授權，不得重製、散布、公開傳輸、改作或進行商業利用。
+  Unauthorized copying, distribution, modification, or commercial use is prohibited.
+
+  授權條款詳見同目錄下的 LICENSE 檔案。
+  See the LICENSE file for full terms.
+
+  本專案使用 Google MediaPipe Tasks Vision (Apache License 2.0)。
+-->
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>飛鏢投擲骨架分析器</title>
+    <meta name="author" content="hsinnan64" />
+    <meta name="copyright" content="Copyright © 2026 hsinnan64. All Rights Reserved." />
     <style>
         * {
             margin: 0;
@@ -40,16 +56,9 @@
         h1 {
             color: #1d4ed8;
             text-align: center;
-            margin-bottom: 4px;
+            margin-bottom: 14px;
             font-size: 24px;
             letter-spacing: 0.5px;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #64748b;
-            font-size: 12px;
-            margin-bottom: 14px;
         }
 
         /* 按鈕區：RWD 網格 */
@@ -247,12 +256,39 @@
             font-weight: 500;
             color: #1d4ed8;
         }
+
+        .copyright {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        .site-links {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .site-links a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+
+        .site-links a:hover {
+            text-decoration: underline;
+        }
+
+        .link-sep {
+            color: #cbd5e1;
+            margin: 0 8px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>飛鏢投擲骨架分析器</h1>
-        <div class="subtitle">每次舉手自動換色，軌跡完整保留可互相比對</div>
 
         <!-- 控制區：RWD -->
         <div class="controls" id="controls">
@@ -315,6 +351,21 @@
                 <span class="info-value" id="statusRecording">關</span>
             </div>
         </div>
+
+        <!--
+          頁尾連結：目前隱藏中。
+          要對外開放贊助頁與隱私權政策頁時，把下面這行的 hidden 拿掉即可。
+        -->
+        <nav class="site-links" id="siteLinks" hidden>
+            <a href="sponsor.html">贊助支持</a>
+            <span class="link-sep">·</span>
+            <a href="privacy.html">隱私權政策</a>
+        </nav>
+
+        <footer class="copyright">
+            版權所有 © 2026 hsinnan64．保留一切權利<br />
+            姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
+        </footer>
     </div>
 
     <script type="module">
