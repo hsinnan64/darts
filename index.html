@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.4　最後更新：2026-09-14 17:18
+  版本：v1.5　最後更新：2026-09-14 17:27
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -353,8 +353,8 @@
             <!-- 骨架與三條軌跡都是疊在畫面上的東西，排在一起 -->
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕：開</button>
-            <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部：關</button>
-            <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀：關</button>
+            <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部：開</button>
+            <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀：開</button>
 
             <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
         </div>
@@ -390,11 +390,11 @@
             </div>
             <div class="info-row">
                 <span class="info-label">頭部軌跡：</span>
-                <span class="info-value" id="statusHeadTrace">關</span>
+                <span class="info-value" id="statusHeadTrace">開</span>
             </div>
             <div class="info-row">
                 <span class="info-label">肩膀軌跡：</span>
-                <span class="info-value" id="statusShoulderTrace">關</span>
+                <span class="info-value" id="statusShoulderTrace">開</span>
             </div>
             <div class="info-row">
                 <span class="info-label">錄製狀態：</span>
@@ -425,7 +425,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.4　最後更新 2026-09-14 17:18</span><br />
+            <span class="version">版本 v1.5　最後更新 2026-09-14 17:27</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -638,7 +638,59 @@
         // 關鍵點索引
         const WRIST_INDEX = { left: 15, right: 16 };
         const SHOULDER_INDEX = { left: 11, right: 12 };
-        const NOSE_INDEX = 0; // 以鼻子代表頭部位置：側面拍攝時也看得到，比耳朵穩定
+        const EAR_INDEX = { left: 7, right: 8 };
+        const EYE_INDEX = { left: 2, right: 5 };
+        const MOUTH_INDEX = { left: 9, right: 10 };
+        const NOSE_INDEX = 0;
+
+        // MediaPipe 沒有頭頂關鍵點，用耳朵位置往上推估。
+        // 尺規取臉部尺寸而不是肩膀：肩膀晃動時不會連帶汙染頭部穩定度的量測。
+        // 係數依人臉比例推算（耳到頭頂約 1.35 倍的眼到嘴距離），
+        // 頭頂點若明顯偏高或偏低就調這個數字。
+        const HEAD_TOP_RATIO = 1.35;
+
+        function isVisible(lm) {
+            return lm && (lm.visibility == null || lm.visibility >= MIN_VISIBILITY_DRAW);
+        }
+
+        function midPoint(a, b) {
+            const pts = [a, b].filter(isVisible);
+            if (!pts.length) return null;
+            if (pts.length === 1) return pts[0];
+            return {
+                x: (pts[0].x + pts[1].x) / 2,
+                y: (pts[0].y + pts[1].y) / 2,
+                visibility: Math.min(
+                    pts[0].visibility != null ? pts[0].visibility : 1,
+                    pts[1].visibility != null ? pts[1].visibility : 1
+                )
+            };
+        }
+
+        // 頭部尺寸尺規：用「眼到嘴」的垂直距離。
+        // 頭左右轉動時這個距離幾乎不變，但眼到耳的距離會因為看到側臉輪廓而暴增
+        // （側面約正面的兩倍），拿它當尺規會讓側面拍攝時的頭頂點飛得太高。
+        function faceScale(landmarks) {
+            const eye = midPoint(landmarks[EYE_INDEX.left], landmarks[EYE_INDEX.right]);
+            const mouth = midPoint(landmarks[MOUTH_INDEX.left], landmarks[MOUTH_INDEX.right]);
+            if (!eye || !mouth) return null;
+            return Math.abs(mouth.y - eye.y);
+        }
+
+        function computeHeadTop(landmarks) {
+            const ear = midPoint(landmarks[EAR_INDEX.left], landmarks[EAR_INDEX.right]);
+            const nose = landmarks[NOSE_INDEX];
+            if (!ear) return isVisible(nose) ? nose : null;
+
+            const scale = faceScale(landmarks);
+            if (!scale) return ear;
+
+            return {
+                x: ear.x,
+                y: ear.y - scale * HEAD_TOP_RATIO,
+                visibility: ear.visibility != null ? ear.visibility : 0.8
+            };
+        }
 
         function createTrace(color, enabled) {
             return { points: [], color, enabled };
@@ -646,8 +698,8 @@
 
         const traces = {
             wrist: createTrace("255,60,60", true),    // 紅
-            head: createTrace("255,215,70", false),   // 黃
-            shoulder: createTrace("80,210,255", false) // 青
+            head: createTrace("255,215,70", true),    // 黃
+            shoulder: createTrace("80,210,255", true) // 青
         };
 
         function createHandState() {
@@ -714,7 +766,7 @@
                 pushTracePoint(traces.wrist, hand === "right" ? rightWrist : leftWrist);
             }
             if (traces.head.enabled) {
-                pushTracePoint(traces.head, landmarks[NOSE_INDEX]);
+                pushTracePoint(traces.head, computeHeadTop(landmarks));
             }
             if (traces.shoulder.enabled) {
                 // 追蹤投擲手同側的肩膀，方便和手臂動作直接對照
@@ -962,15 +1014,8 @@
                 [11, 12], [11, 23], [12, 24], [23, 24],
                 [11, 13], [13, 15], [12, 14], [14, 16],
                 [23, 25], [25, 27], [27, 29], [29, 31],
-                [24, 26], [26, 28], [28, 30], [30, 32],
-                // 頭部：鼻子—眼睛—耳朵，以及嘴巴
-                [0, 1], [1, 2], [2, 3], [3, 7],
-                [0, 4], [4, 5], [5, 6], [6, 8],
-                [9, 10]
+                [24, 26], [26, 28], [28, 30], [30, 32]
             ];
-
-            const visible = (lm) =>
-                lm && (lm.visibility == null || lm.visibility >= MIN_VISIBILITY_DRAW);
 
             ctx.lineWidth = 4;
             ctx.strokeStyle = "rgba(255,255,255,0.9)";
@@ -979,33 +1024,48 @@
             for (const [s, e] of connections) {
                 const a = landmarks[s];
                 const b = landmarks[e];
-                if (!visible(a) || !visible(b)) continue;
+                if (!isVisible(a) || !isVisible(b)) continue;
                 ctx.beginPath();
                 ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
                 ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
                 ctx.stroke();
             }
 
-            for (let i = 0; i < landmarks.length; i++) {
-                if (i >= 17 && i <= 22) continue; // 17–22 為手指節點
-                const lm = landmarks[i];
-                if (!visible(lm)) continue;
-
-                const x = lm.x * canvas.width;
-                const y = lm.y * canvas.height;
-                const alpha = lm.visibility != null ? lm.visibility : 0.8;
-                // 頭部點密集，畫小一點才不會糊成一團遮住臉
-                const radius = i <= 10 ? 4 : 7;
-
+            // 頭部只用一個頭頂點，並拉一條「頸線」連到兩肩中點
+            const headTop = computeHeadTop(landmarks);
+            const neck = midPoint(landmarks[SHOULDER_INDEX.left], landmarks[SHOULDER_INDEX.right]);
+            if (headTop && neck) {
+                ctx.strokeStyle = "rgba(255,255,255,0.9)";
+                ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.fillStyle = `rgba(255,0,0,${alpha})`;
-                ctx.arc(x, y, radius, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-                ctx.lineWidth = 2;
+                ctx.moveTo(neck.x * canvas.width, neck.y * canvas.height);
+                ctx.lineTo(headTop.x * canvas.width, headTop.y * canvas.height);
                 ctx.stroke();
             }
+
+            for (let i = 0; i < landmarks.length; i++) {
+                if (i <= 10) continue;            // 0–10 為臉部，改用單一頭頂點代表
+                if (i >= 17 && i <= 22) continue; // 17–22 為手指節點
+                const lm = landmarks[i];
+                if (!isVisible(lm)) continue;
+                drawJoint(lm.x, lm.y, lm.visibility != null ? lm.visibility : 0.8);
+            }
+
+            if (headTop) drawJoint(headTop.x, headTop.y, headTop.visibility);
+        }
+
+        function drawJoint(nx, ny, alpha) {
+            const x = nx * canvas.width;
+            const y = ny * canvas.height;
+
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255,0,0,${alpha})`;
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
 
         // === 錄製：把 canvas 畫面（影片 + 骨架 + 軌跡）另存成影片檔 ===
