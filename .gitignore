@@ -13,3 +13,6 @@ desktop.ini
 *.mp4
 *.webm
 *.mov
+
+# 個人技術筆記（含調校參數與踩坑記錄，不對外公開）
+NOTES.md

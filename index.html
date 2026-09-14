@@ -2,6 +2,11 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
+  版本：v1.0　最後更新：2026-09-14
+  ⚠️ 改版時，記得同步更新下面兩處：
+     1. 這裡的版本與日期
+     2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
+
   版權所有 © 2026 hsinnan64. 保留一切權利。
   Copyright © 2026 hsinnan64. All Rights Reserved.
 
@@ -265,6 +270,12 @@
             line-height: 1.6;
         }
 
+        /* 版本與更新日期：顏色略深，方便一眼確認載入的是不是最新版 */
+        .version {
+            color: #64748b;
+            font-weight: 600;
+        }
+
         .site-links {
             margin-top: 14px;
             text-align: center;
@@ -363,6 +374,7 @@
         </nav>
 
         <footer class="copyright">
+            <span class="version">版本 v1.0　最後更新 2026-09-14</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
