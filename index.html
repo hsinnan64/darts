@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.2　最後更新：2026-09-14 17:10
+  版本：v1.3　最後更新：2026-09-14 17:13
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -66,10 +66,10 @@
             letter-spacing: 0.5px;
         }
 
-        /* 按鈕區：手機 2 欄 → 平板 3 欄 → 桌機 5 欄（10 個按鈕剛好 2 排） */
+        /* 按鈕區：手機與平板 3 欄 → 桌機 5 欄 */
         .controls {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
             max-width: 860px;
             margin: 8px auto 14px;
@@ -77,7 +77,6 @@
 
         @media (min-width: 480px) {
             .controls {
-                grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 10px;
             }
         }
@@ -92,8 +91,9 @@
             border: none;
             border-radius: 999px;
             cursor: pointer;
-            font-size: 13px;
-            padding: 11px 6px;
+            /* 手機 3 欄時欄寬只有 ~100px，字級要壓到 12px 才容得下「手腕軌跡：開」 */
+            font-size: 12px;
+            padding: 11px 4px;
             text-align: center;
             white-space: nowrap;
             transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
@@ -340,18 +340,22 @@
             </button>
             <input type="file" id="fileInput" accept="video/*" style="display:none;" />
 
-            <!-- 桌機為一排 5 個：這排是播放控制，錄製排在最右 -->
+            <!--
+              按鈕順序刻意這樣排，讓手機（3 欄）與桌機（5 欄）都成立：
+                手機 → 第 3 排剛好是三個軌跡，錄製單獨落在最後一排
+                桌機 → 三個軌跡同在第 2 排，錄製在最後
+            -->
             <button class="control-btn play-btn" id="playBtn" onclick="playVideo()" disabled>播放</button>
             <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseVideo()" disabled>暫停</button>
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
-            <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
-
-            <!-- 第二排：顯示與軌跡控制 -->
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
+
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：開</button>
             <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部軌跡：關</button>
             <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀軌跡：關</button>
+
+            <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -419,7 +423,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.2　最後更新 2026-09-14 17:10</span><br />
+            <span class="version">版本 v1.3　最後更新 2026-09-14 17:13</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
