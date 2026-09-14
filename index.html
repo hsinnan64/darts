@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.0　最後更新：2026-09-14 16:23
+  版本：v1.1　最後更新：2026-09-14 17:06
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -125,10 +125,25 @@
             color: #1e3a8a;
         }
 
-        /* 手腕軌跡：紫色 */
+        /* 三個軌跡按鈕的底色，對應畫面上各自的軌跡顏色 */
         .wrist-trace-btn {
-            background: #c084fc;
-            color: #4c0519;
+            background: #fca5a5;
+            color: #7f1d1d;
+        }
+
+        .head-trace-btn {
+            background: #fde68a;
+            color: #78350f;
+        }
+
+        .shoulder-trace-btn {
+            background: #a5d8f3;
+            color: #0c4a6e;
+        }
+
+        /* 最後一排只有兩個按鈕，各佔兩格才不會留空 */
+        .controls .wide {
+            grid-column: span 2;
         }
 
         /* 純黑背景：深灰 */
@@ -310,11 +325,15 @@
 
             <button class="control-btn play-btn" id="playBtn" onclick="playVideo()" disabled>播放</button>
             <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseVideo()" disabled>暫停</button>
+            <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
+
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
-            <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：開</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
-            <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
+            <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕軌跡：開</button>
+
+            <button class="control-btn head-trace-btn wide" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部軌跡：關</button>
+            <button class="control-btn shoulder-trace-btn wide" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀軌跡：關</button>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -350,6 +369,14 @@
                 <span class="info-value" id="statusHand">自動判斷中</span>
             </div>
             <div class="info-row">
+                <span class="info-label">頭部移動幅度：</span>
+                <span class="info-value" id="statusHeadMove">未開啟</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">肩膀移動幅度：</span>
+                <span class="info-value" id="statusShoulderMove">未開啟</span>
+            </div>
+            <div class="info-row">
                 <span class="info-label">背景模式：</span>
                 <span class="info-value" id="statusBlackBg">影片</span>
             </div>
@@ -374,7 +401,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.0　最後更新 2026-09-14 16:23</span><br />
+            <span class="version">版本 v1.1　最後更新 2026-09-14 17:06</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -407,6 +434,10 @@
         const statusSkeletonShow = document.getElementById("statusSkeletonShow");
         const statusWristTrace = document.getElementById("statusWristTrace");
         const statusHand = document.getElementById("statusHand");
+        const statusHeadMove = document.getElementById("statusHeadMove");
+        const statusShoulderMove = document.getElementById("statusShoulderMove");
+        const toggleHeadTraceBtn = document.getElementById("toggleHeadTraceBtn");
+        const toggleShoulderTraceBtn = document.getElementById("toggleShoulderTraceBtn");
         const statusBlackBg = document.getElementById("statusBlackBg");
         const statusFPS = document.getElementById("statusFPS");
         const statusRecording = document.getElementById("statusRecording");
@@ -571,50 +602,64 @@
             });
         }
 
-        // === 手腕軌跡：單一紅色連續軌跡 ===
-        let wristTraceEnabled = true;
-
-        const TRACE_COLOR = "255,60,60";     // 軌跡固定紅色
+        // === 軌跡：手腕（紅）／頭部（黃）／肩膀（青），三條各自獨立開關 ===
+        //
+        // 用途差異：
+        //   手腕 — 看出手路徑是否一致
+        //   頭部、肩膀 — 投擲時這兩處應該幾乎不動，軌跡越短越集中代表動作越穩定，
+        //                所以除了畫線，還會即時算出移動幅度給使用者參考
         const MAX_TRACE_POINTS = 800;        // 保留夠長的軌跡，不會中途消失
         const MIN_TRACE_SPACING = 0.004;     // 幾乎沒動就不重複記錄
 
-        // 手腕索引（左 15 / 右 16）
+        // 關鍵點索引
         const WRIST_INDEX = { left: 15, right: 16 };
+        const SHOULDER_INDEX = { left: 11, right: 12 };
+        const NOSE_INDEX = 0; // 以鼻子代表頭部位置：側面拍攝時也看得到，比耳朵穩定
 
-        function createTraceState() {
-            return {
-                points: [],      // [{x, y}]
-                moveAmount: 0,   // 累積移動量，用來判斷哪隻手是投擲手
-                prevPoint: null
-            };
+        function createTrace(color, enabled) {
+            return { points: [], color, enabled };
         }
 
-        const traceStates = {
-            left: createTraceState(),
-            right: createTraceState()
+        const traces = {
+            wrist: createTrace("255,60,60", true),    // 紅
+            head: createTrace("255,215,70", false),   // 黃
+            shoulder: createTrace("80,210,255", false) // 青
+        };
+
+        function createHandState() {
+            return { moveAmount: 0, prevPoint: null };
+        }
+
+        const handStates = {
+            left: createHandState(),
+            right: createHandState()
         };
 
         // 投擲手：取累積移動量較大的那隻手，只畫它的軌跡，畫面才不會被另一手干擾
         let dominantHand = null;
 
-        function clearWristTrace() {
-            traceStates.left = createTraceState();
-            traceStates.right = createTraceState();
+        function clearAllTraces() {
+            for (const key of Object.keys(traces)) {
+                traces[key].points.length = 0;
+            }
+            handStates.left = createHandState();
+            handStates.right = createHandState();
             dominantHand = null;
             statusHand.textContent = "自動判斷中";
+            updateStabilityStatus();
         }
 
-        function pushTracePoint(state, lm) {
+        function pushTracePoint(trace, lm) {
             if (!lm) return;
             if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
 
-            const last = state.points[state.points.length - 1];
+            const last = trace.points[trace.points.length - 1];
             if (last) {
                 const d = Math.hypot(lm.x - last.x, lm.y - last.y);
                 if (d < MIN_TRACE_SPACING) return;
             }
-            state.points.push({ x: lm.x, y: lm.y });
-            if (state.points.length > MAX_TRACE_POINTS) state.points.shift();
+            trace.points.push({ x: lm.x, y: lm.y });
+            if (trace.points.length > MAX_TRACE_POINTS) trace.points.shift();
         }
 
         // 累積該手的移動量，供投擲手判定
@@ -627,35 +672,80 @@
             state.prevPoint = { x: lm.x, y: lm.y };
         }
 
-        function updateWristTrace(landmarks) {
+        function updateTraces(landmarks) {
             if (!landmarks || !Array.isArray(landmarks)) return;
 
-            const leftLm = landmarks[WRIST_INDEX.left];
-            const rightLm = landmarks[WRIST_INDEX.right];
-            accumulateMovement(traceStates.left, leftLm);
-            accumulateMovement(traceStates.right, rightLm);
+            const leftWrist = landmarks[WRIST_INDEX.left];
+            const rightWrist = landmarks[WRIST_INDEX.right];
+            accumulateMovement(handStates.left, leftWrist);
+            accumulateMovement(handStates.right, rightWrist);
 
-            const hand = traceStates.right.moveAmount >= traceStates.left.moveAmount ? "right" : "left";
+            const hand = handStates.right.moveAmount >= handStates.left.moveAmount ? "right" : "left";
             if (hand !== dominantHand) {
                 dominantHand = hand;
                 statusHand.textContent = hand === "right" ? "右手" : "左手";
             }
 
-            pushTracePoint(traceStates[hand], hand === "right" ? rightLm : leftLm);
+            if (traces.wrist.enabled) {
+                pushTracePoint(traces.wrist, hand === "right" ? rightWrist : leftWrist);
+            }
+            if (traces.head.enabled) {
+                pushTracePoint(traces.head, landmarks[NOSE_INDEX]);
+            }
+            if (traces.shoulder.enabled) {
+                // 追蹤投擲手同側的肩膀，方便和手臂動作直接對照
+                pushTracePoint(traces.shoulder, landmarks[SHOULDER_INDEX[hand]]);
+            }
+
+            updateStabilityStatus();
         }
 
-        function activeTraceState() {
-            return traceStates[dominantHand || "right"];
+        // 移動幅度＝軌跡點涵蓋範圍的對角線長度（正規化座標），轉成畫面百分比
+        function traceSpread(trace) {
+            const pts = trace.points;
+            if (pts.length < 2) return 0;
+            let minX = 1, maxX = 0, minY = 1, maxY = 0;
+            for (const p of pts) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+            }
+            return Math.hypot(maxX - minX, maxY - minY);
         }
 
-        // 畫手腕軌跡：固定紅色、固定粗細，不淡出、不消失
-        function drawWristTrace() {
-            const pts = activeTraceState().points;
+        // 門檻為初步估值，實測後可再調整
+        function stabilityLabel(spread) {
+            const pct = (spread * 100).toFixed(1) + "%";
+            if (spread < 0.02) return "穩定（" + pct + "）";
+            if (spread < 0.05) return "輕微晃動（" + pct + "）";
+            return "明顯移動（" + pct + "）";
+        }
+
+        function updateStabilityStatus() {
+            statusHeadMove.textContent = traces.head.enabled
+                ? (traces.head.points.length < 2 ? "偵測中…" : stabilityLabel(traceSpread(traces.head)))
+                : "未開啟";
+            statusShoulderMove.textContent = traces.shoulder.enabled
+                ? (traces.shoulder.points.length < 2 ? "偵測中…" : stabilityLabel(traceSpread(traces.shoulder)))
+                : "未開啟";
+        }
+
+        // 畫所有已開啟的軌跡：固定顏色與粗細，不淡出、不消失
+        // 手腕最後畫，確保疊在最上層
+        function drawTraces() {
+            for (const key of ["head", "shoulder", "wrist"]) {
+                if (traces[key].enabled) drawTraceLine(traces[key]);
+            }
+        }
+
+        function drawTraceLine(trace) {
+            const pts = trace.points;
             if (pts.length < 2) return;
 
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
-            ctx.strokeStyle = `rgba(${TRACE_COLOR},0.9)`;
+            ctx.strokeStyle = `rgba(${trace.color},0.9)`;
             ctx.lineWidth = 4;
 
             ctx.beginPath();
@@ -808,7 +898,7 @@
             if (!poseLandmarker || !modelReady) return;
             if (!skeletonEnabled) {
                 // 骨架關閉時仍然把已記錄的軌跡畫出來
-                if (wristTraceEnabled) drawWristTrace();
+                drawTraces();
                 return;
             }
 
@@ -818,12 +908,10 @@
                 if (result.landmarks && result.landmarks.length > 0) {
                     lastLandmarks = smoothLandmarks(result.landmarks[0], now);
                     // 3. 軌跡只在拿到新偵測結果時累積
-                    if (wristTraceEnabled) {
-                        updateWristTrace(lastLandmarks);
-                    }
+                    updateTraces(lastLandmarks);
                 }
 
-                if (wristTraceEnabled) drawWristTrace();
+                drawTraces();
                 if (lastLandmarks) drawSkeleton(lastLandmarks);
             } catch (e) {
                 console.error("detectForVideo 錯誤:", e);
@@ -838,7 +926,11 @@
                 [11, 12], [11, 23], [12, 24], [23, 24],
                 [11, 13], [13, 15], [12, 14], [14, 16],
                 [23, 25], [25, 27], [27, 29], [29, 31],
-                [24, 26], [26, 28], [28, 30], [30, 32]
+                [24, 26], [26, 28], [28, 30], [30, 32],
+                // 頭部：鼻子—眼睛—耳朵，以及嘴巴
+                [0, 1], [1, 2], [2, 3], [3, 7],
+                [0, 4], [4, 5], [5, 6], [6, 8],
+                [9, 10]
             ];
 
             const visible = (lm) =>
@@ -859,7 +951,6 @@
             }
 
             for (let i = 0; i < landmarks.length; i++) {
-                if (i <= 10) continue;            // 0–10 為頭部/臉部
                 if (i >= 17 && i <= 22) continue; // 17–22 為手指節點
                 const lm = landmarks[i];
                 if (!visible(lm)) continue;
@@ -867,10 +958,12 @@
                 const x = lm.x * canvas.width;
                 const y = lm.y * canvas.height;
                 const alpha = lm.visibility != null ? lm.visibility : 0.8;
+                // 頭部點密集，畫小一點才不會糊成一團遮住臉
+                const radius = i <= 10 ? 4 : 7;
 
                 ctx.beginPath();
                 ctx.fillStyle = `rgba(255,0,0,${alpha})`;
-                ctx.arc(x, y, 7, 0, Math.PI * 2);
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
                 ctx.fill();
 
                 ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
@@ -993,7 +1086,7 @@
             stopDetectLoop();
             video.pause();
             clearCanvas();
-            clearWristTrace();
+            clearAllTraces();
             resetSmoothing();
             lastLandmarks = null;
 
@@ -1019,6 +1112,8 @@
             resetBtn.disabled = false;
             toggleSkeletonBtn.disabled = false;
             toggleWristTraceBtn.disabled = false;
+            toggleHeadTraceBtn.disabled = false;
+            toggleShoulderTraceBtn.disabled = false;
             toggleBlackBgBtn.disabled = false;
             recordBtn.disabled = false;
 
@@ -1071,7 +1166,7 @@
         window.resetVideo = function () {
             stopDetectLoop();
             clearCanvas();
-            clearWristTrace();
+            clearAllTraces();
             resetSmoothing();
             lastLandmarks = null;
             video.currentTime = 0;
@@ -1095,11 +1190,26 @@
             }
         };
 
+        // 關閉某條軌跡時只清掉它自己的點，其他兩條不受影響
+        function toggleTrace(key, btn, label, statusEl) {
+            const trace = traces[key];
+            trace.enabled = !trace.enabled;
+            if (!trace.enabled) trace.points.length = 0;
+            btn.textContent = label + (trace.enabled ? "：開" : "：關");
+            if (statusEl) statusEl.textContent = trace.enabled ? "開" : "關";
+            updateStabilityStatus();
+        }
+
         window.toggleWristTrace = function () {
-            wristTraceEnabled = !wristTraceEnabled;
-            toggleWristTraceBtn.textContent = wristTraceEnabled ? "手腕軌跡：開" : "手腕軌跡：關";
-            statusWristTrace.textContent = wristTraceEnabled ? "開" : "關";
-            if (!wristTraceEnabled) clearWristTrace();
+            toggleTrace("wrist", toggleWristTraceBtn, "手腕軌跡", statusWristTrace);
+        };
+
+        window.toggleHeadTrace = function () {
+            toggleTrace("head", toggleHeadTraceBtn, "頭部軌跡", null);
+        };
+
+        window.toggleShoulderTrace = function () {
+            toggleTrace("shoulder", toggleShoulderTraceBtn, "肩膀軌跡", null);
         };
 
         window.toggleBlackBg = function () {
