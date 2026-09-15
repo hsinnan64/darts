@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.6　最後更新：2026-09-15 15:04
+  版本：v1.7　最後更新：2026-09-15 15:24
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -147,10 +147,15 @@
             color: #1e3a8a;
         }
 
-        /* 三個軌跡按鈕的底色，對應畫面上各自的軌跡顏色 */
+        /* 四個軌跡按鈕的底色，對應畫面上各自的軌跡顏色 */
         .wrist-trace-btn {
             background: #fca5a5;
             color: #7f1d1d;
+        }
+
+        .elbow-trace-btn {
+            background: #bbf7d0;
+            color: #14532d;
         }
 
         .head-trace-btn {
@@ -340,19 +345,14 @@
             </button>
             <input type="file" id="fileInput" accept="video/*" style="display:none;" />
 
-            <!--
-              按鈕順序刻意這樣排，讓手機（3 欄）與桌機（5 欄）都成立：
-                手機 → 第 3 排剛好是三個軌跡，錄製單獨落在最後一排
-                桌機 → 三個軌跡同在第 2 排，錄製在最後
-            -->
-            <button class="control-btn play-btn" id="playBtn" onclick="playVideo()" disabled>播放</button>
-            <button class="control-btn pause-btn" id="pauseBtn" onclick="pauseVideo()" disabled>暫停</button>
+            <!-- 桌機 5 欄時，第一排是控制類、第二排剛好是四條軌跡加錄製 -->
+            <button class="control-btn play-btn" id="playPauseBtn" onclick="togglePlay()" disabled>播放</button>
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
             <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
-
-            <!-- 骨架與三條軌跡都是疊在畫面上的東西，排在一起 -->
             <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
+
             <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕：開</button>
+            <button class="control-btn elbow-trace-btn" id="toggleElbowTraceBtn" onclick="toggleElbowTrace()" disabled>手肘：開</button>
             <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部：開</button>
             <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀：開</button>
 
@@ -387,6 +387,10 @@
             <div class="info-row">
                 <span class="info-label">手腕軌跡：</span>
                 <span class="info-value" id="statusWristTrace">開</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">手肘軌跡：</span>
+                <span class="info-value" id="statusElbowTrace">開</span>
             </div>
             <div class="info-row">
                 <span class="info-label">頭部軌跡：</span>
@@ -425,7 +429,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.6　最後更新 2026-09-15 15:04</span><br />
+            <span class="version">版本 v1.7　最後更新 2026-09-15 15:24</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -445,11 +449,13 @@
 
         const uploadBtn = document.getElementById("uploadBtn");
         const fileInput = document.getElementById("fileInput");
-        const playBtn = document.getElementById("playBtn");
-        const pauseBtn = document.getElementById("pauseBtn");
+        const playPauseBtn = document.getElementById("playPauseBtn");
         const resetBtn = document.getElementById("resetBtn");
         const toggleSkeletonBtn = document.getElementById("toggleSkeletonBtn");
         const toggleWristTraceBtn = document.getElementById("toggleWristTraceBtn");
+        const toggleElbowTraceBtn = document.getElementById("toggleElbowTraceBtn");
+        const toggleHeadTraceBtn = document.getElementById("toggleHeadTraceBtn");
+        const toggleShoulderTraceBtn = document.getElementById("toggleShoulderTraceBtn");
         const toggleBlackBgBtn = document.getElementById("toggleBlackBgBtn");
         const recordBtn = document.getElementById("recordBtn");
 
@@ -457,11 +463,10 @@
         const statusModel = document.getElementById("statusModel");
         const statusSkeletonShow = document.getElementById("statusSkeletonShow");
         const statusWristTrace = document.getElementById("statusWristTrace");
+        const statusElbowTrace = document.getElementById("statusElbowTrace");
         const statusHand = document.getElementById("statusHand");
         const statusHeadTrace = document.getElementById("statusHeadTrace");
         const statusShoulderTrace = document.getElementById("statusShoulderTrace");
-        const toggleHeadTraceBtn = document.getElementById("toggleHeadTraceBtn");
-        const toggleShoulderTraceBtn = document.getElementById("toggleShoulderTraceBtn");
         const statusBlackBg = document.getElementById("statusBlackBg");
         const statusFPS = document.getElementById("statusFPS");
         const statusRecording = document.getElementById("statusRecording");
@@ -637,6 +642,7 @@
 
         // 關鍵點索引
         const WRIST_INDEX = { left: 15, right: 16 };
+        const ELBOW_INDEX = { left: 13, right: 14 };
         const SHOULDER_INDEX = { left: 11, right: 12 };
         const EAR_INDEX = { left: 7, right: 8 };
         const EYE_INDEX = { left: 2, right: 5 };
@@ -697,9 +703,10 @@
         }
 
         const traces = {
-            wrist: createTrace("255,60,60", true),    // 紅
-            head: createTrace("255,215,70", true),    // 黃
-            shoulder: createTrace("80,210,255", true) // 青
+            wrist: createTrace("255,60,60", true),     // 紅
+            elbow: createTrace("140,255,120", true),   // 綠
+            head: createTrace("255,215,70", true),     // 黃
+            shoulder: createTrace("80,210,255", true)  // 青
         };
 
         function createHandState() {
@@ -762,14 +769,17 @@
                 statusHand.textContent = hand === "right" ? "右手" : "左手";
             }
 
+            // 手肘與肩膀都追蹤投擲手同側，方便和手臂動作直接對照
             if (traces.wrist.enabled) {
                 pushTracePoint(traces.wrist, hand === "right" ? rightWrist : leftWrist);
+            }
+            if (traces.elbow.enabled) {
+                pushTracePoint(traces.elbow, landmarks[ELBOW_INDEX[hand]]);
             }
             if (traces.head.enabled) {
                 pushTracePoint(traces.head, computeHeadTop(landmarks));
             }
             if (traces.shoulder.enabled) {
-                // 追蹤投擲手同側的肩膀，方便和手臂動作直接對照
                 pushTracePoint(traces.shoulder, landmarks[SHOULDER_INDEX[hand]]);
             }
 
@@ -794,7 +804,7 @@
             return (spread * 100).toFixed(1) + "%";
         }
 
-        // 頭與肩在投擲時應該幾乎不動，所以給穩定度評語。
+        // 頭、肩、手肘在投擲時都應該幾乎不動（手肘是前臂鐘擺的支點），所以給穩定度評語。
         // 門檻為初步估值，實測後可再調整。
         function stabilityLabel(spread) {
             const pct = spreadPercent(spread);
@@ -815,6 +825,7 @@
                 traces.wrist,
                 (s) => "開（範圍 " + spreadPercent(s) + "）"
             );
+            statusElbowTrace.textContent = traceStatusText(traces.elbow, stabilityLabel);
             statusHeadTrace.textContent = traceStatusText(traces.head, stabilityLabel);
             statusShoulderTrace.textContent = traceStatusText(traces.shoulder, stabilityLabel);
         }
@@ -822,7 +833,7 @@
         // 畫所有已開啟的軌跡：固定顏色與粗細，不淡出、不消失
         // 手腕最後畫，確保疊在最上層
         function drawTraces() {
-            for (const key of ["head", "shoulder", "wrist"]) {
+            for (const key of ["head", "shoulder", "elbow", "wrist"]) {
                 if (traces[key].enabled) drawTraceLine(traces[key]);
             }
         }
@@ -1290,11 +1301,11 @@
 
             canvasContainer.style.display = "block";
 
-            playBtn.disabled = false;
-            pauseBtn.disabled = false;
+            playPauseBtn.disabled = false;
             resetBtn.disabled = false;
             toggleSkeletonBtn.disabled = false;
             toggleWristTraceBtn.disabled = false;
+            toggleElbowTraceBtn.disabled = false;
             toggleHeadTraceBtn.disabled = false;
             toggleShoulderTraceBtn.disabled = false;
             toggleBlackBgBtn.disabled = false;
@@ -1305,20 +1316,32 @@
             setPlaybackStatus("待機");
         });
 
+        // 按鈕文字跟著影片的實際狀態走，不自己記狀態，
+        // 這樣用鍵盤或其他方式改變播放狀態時也不會顯示錯誤
+        function syncPlayPauseButton() {
+            const playing = !video.paused && !video.ended;
+            playPauseBtn.textContent = playing ? "暫停" : "播放";
+            playPauseBtn.classList.toggle("play-btn", !playing);
+            playPauseBtn.classList.toggle("pause-btn", playing);
+        }
+
         video.addEventListener("play", () => {
             hideError();
             setPlaybackStatus("播放中");
+            syncPlayPauseButton();
             startDetectLoop();
         });
 
         video.addEventListener("pause", () => {
             stopDetectLoop();
+            syncPlayPauseButton();
             if (!video.ended) setPlaybackStatus("已暫停");
         });
 
         video.addEventListener("ended", () => {
             stopDetectLoop();
             stopRecordingIfNeeded();
+            syncPlayPauseButton();
             setPlaybackStatus("已結束");
         });
 
@@ -1332,18 +1355,18 @@
         });
 
         // === 提供給 HTML 按鈕呼叫的控制函式 ===
-        window.playVideo = async function () {
-            hideError();
-            try {
-                await video.play();
-            } catch (e) {
-                showError("播放失敗：" + e.message);
-                console.error("播放錯誤:", e);
+        window.togglePlay = async function () {
+            if (video.paused || video.ended) {
+                hideError();
+                try {
+                    await video.play();
+                } catch (e) {
+                    showError("播放失敗：" + e.message);
+                    console.error("播放錯誤:", e);
+                }
+            } else {
+                video.pause();
             }
-        };
-
-        window.pauseVideo = function () {
-            video.pause();
         };
 
         window.resetVideo = function () {
@@ -1384,6 +1407,10 @@
 
         window.toggleWristTrace = function () {
             toggleTrace("wrist", toggleWristTraceBtn, "手腕");
+        };
+
+        window.toggleElbowTrace = function () {
+            toggleTrace("elbow", toggleElbowTraceBtn, "手肘");
         };
 
         window.toggleHeadTrace = function () {
