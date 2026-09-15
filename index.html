@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.9　最後更新：2026-09-15 15:41
+  版本：v2.0　最後更新：2026-09-15 15:47
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -429,7 +429,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.9　最後更新 2026-09-15 15:41</span><br />
+            <span class="version">版本 v2.0　最後更新 2026-09-15 15:47</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -527,8 +527,11 @@
 
         function makeFilterParams(idx) {
             if (FAST_LIMB_INDICES.has(idx)) {
-                // 手肘/手腕：偵測雜訊最大，用最強的平滑設定
-                return { minCutoff: 0.35, beta: 0.05, dCutoff: 1.0 };
+                // 手肘/手腕：beta 決定「動得越快、濾波越弱」的自適應強度。
+                // 曾經為了壓抖動把 beta 降到 0.05，等於關掉自適應，
+                // 出手這種高速動作的延遲量到 667ms，肉眼就是慢一拍。
+                // 跳點是靠離群值拒絕與中位數濾波處理的，不該由 beta 承擔。
+                return { minCutoff: 1.0, beta: 0.7, dCutoff: 1.0 };
             }
             return { minCutoff: 0.8, beta: 0.2, dCutoff: 1.0 };
         }
