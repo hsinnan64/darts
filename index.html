@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.5　最後更新：2026-09-14 17:27
+  版本：v1.6　最後更新：2026-09-15 15:04
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -425,7 +425,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.5　最後更新 2026-09-14 17:27</span><br />
+            <span class="version">版本 v1.6　最後更新 2026-09-15 15:04</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -1072,37 +1072,120 @@
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
+        let recordingStarting = false;
 
-        function startRecording() {
-            if (isRecording) return;
+        // 優先產出 MP4（FB / IG 只吃得下 MP4），H.264 排最前面。
+        // MP4 容器若包 VP9 編碼，副檔名雖然是 .mp4，社群平台仍可能拒收或要求轉檔，
+        // 所以明確指定 avc1 的選項排在只寫 "video/mp4" 之前。
+        const RECORD_MIME_CANDIDATES = [
+            "video/mp4;codecs=avc1.42E01E", // H.264 baseline，相容性最好
+            "video/mp4;codecs=avc1.4d002a", // H.264 main
+            "video/mp4;codecs=avc1",
+            "video/mp4",                    // 容器是 MP4，編碼由瀏覽器決定
+            "video/webm;codecs=vp9",
+            "video/webm;codecs=vp8",
+            "video/webm"
+        ];
+
+        const RECORD_BITRATE = 5000000;
+        let verifiedMimeType = null; // 探測結果只算一次，之後重複使用
+
+        // MediaRecorder.isTypeSupported() 會對某些格式回報 true，實際卻錄不出任何位元組
+        // （實測 Chrome 152 要求 avc1.42E01E 時產出 0 bytes 的壞檔）。
+        // 因此正式錄製前，先用離屏 canvas 實錄 0.3 秒確認真的有資料產出。
+        function canActuallyRecord(mimeType) {
+            return new Promise((resolve) => {
+                let timer = null;
+                try {
+                    const probe = document.createElement("canvas");
+                    probe.width = 64;
+                    probe.height = 64;
+                    const pctx = probe.getContext("2d");
+                    const stream = probe.captureStream(30);
+                    const rec = new MediaRecorder(stream, {
+                        mimeType,
+                        videoBitsPerSecond: RECORD_BITRATE
+                    });
+
+                    let bytes = 0;
+                    rec.ondataavailable = (e) => { bytes += e.data ? e.data.size : 0; };
+                    rec.onerror = () => {};
+                    rec.onstop = () => {
+                        clearInterval(timer);
+                        stream.getTracks().forEach((t) => t.stop());
+                        resolve(bytes > 0);
+                    };
+
+                    // 一定要帶 timeslice，條件才和正式錄製一致。
+                    // 不帶的話資料只在 stop 時產生，H.264 首次初始化來不及 flush 就會量到 0 bytes，
+                    // 導致明明可用的 MP4 被誤判成不支援而退回 WebM。
+                    rec.start(100);
+                    // 畫面必須持續變動，靜止的 canvas 不會產生新的視訊幀
+                    let flip = false;
+                    timer = setInterval(() => {
+                        flip = !flip;
+                        pctx.fillStyle = flip ? "#ffffff" : "#000000";
+                        pctx.fillRect(0, 0, 64, 64);
+                    }, 30);
+                    setTimeout(() => {
+                        try { rec.stop(); } catch (e) { clearInterval(timer); resolve(false); }
+                    }, 300);
+                } catch (e) {
+                    clearInterval(timer);
+                    resolve(false);
+                }
+            });
+        }
+
+        // 讓使用者一眼看出錄出來的檔案能不能直接上傳社群平台
+        function recordFormatLabel(mimeType) {
+            if (!mimeType.includes("mp4")) return "WebM";
+            return mimeType.includes("avc1") ? "MP4 / H.264" : "MP4";
+        }
+
+        async function resolveRecordMimeType() {
+            if (verifiedMimeType !== null) return verifiedMimeType;
+            for (const mimeType of RECORD_MIME_CANDIDATES) {
+                if (!MediaRecorder.isTypeSupported(mimeType)) continue;
+                if (await canActuallyRecord(mimeType)) {
+                    verifiedMimeType = mimeType;
+                    return verifiedMimeType;
+                }
+            }
+            verifiedMimeType = "";
+            return verifiedMimeType;
+        }
+
+        async function startRecording() {
+            if (isRecording || recordingStarting) return;
+
+            // 第一次錄製要跑格式探測，期間鎖住按鈕避免重複觸發
+            recordingStarting = true;
+            recordBtn.disabled = true;
+            statusRecording.textContent = "準備中…";
+
+            let selectedMimeType;
+            try {
+                selectedMimeType = await resolveRecordMimeType();
+            } finally {
+                recordingStarting = false;
+                recordBtn.disabled = false;
+            }
+
+            if (!selectedMimeType) {
+                statusRecording.textContent = "關";
+                showError("此瀏覽器無法錄製畫面，請改用最新版 Chrome / Edge。");
+                return;
+            }
+
             try {
                 const stream = canvas.captureStream(30);
-
-                // WebM 放前面：Chrome / Edge 對 canvas 串流的 WebM 編碼最穩定，
-                // 部分版本雖然回報支援 MP4，實際錄 canvas 卻產不出可用的檔案。
-                let selectedMimeType = "";
-                const supportedMimeTypes = [
-                    "video/webm;codecs=vp9",
-                    "video/webm;codecs=vp8",
-                    "video/webm",
-                    "video/mp4"
-                ];
-                for (const mimeType of supportedMimeTypes) {
-                    if (MediaRecorder.isTypeSupported(mimeType)) {
-                        selectedMimeType = mimeType;
-                        break;
-                    }
-                }
-                if (!selectedMimeType) {
-                    showError("此瀏覽器不支援 MediaRecorder 錄影，請改用最新版 Chrome / Edge。");
-                    return;
-                }
-
                 mediaRecorder = new MediaRecorder(stream, {
                     mimeType: selectedMimeType,
-                    videoBitsPerSecond: 5000000
+                    videoBitsPerSecond: RECORD_BITRATE
                 });
             } catch (e) {
+                statusRecording.textContent = "關";
                 showError("錄製初始化失敗：" + e.message + "\n\n請改用最新版 Chrome / Edge。");
                 console.error(e);
                 return;
@@ -1136,6 +1219,10 @@
                 a.click();
                 document.body.removeChild(a);
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+                if (fileExt !== "mp4") {
+                    showError("此瀏覽器只能錄出 WebM 格式，Facebook / Instagram 無法直接上傳。\n請改用最新版 Chrome 或 Edge，或自行將檔案轉成 MP4。");
+                }
             };
 
             // 帶 timeslice：每秒就切出一塊資料，避免整段只在 stop 時才產生、
@@ -1144,7 +1231,7 @@
             isRecording = true;
             recordBtn.textContent = "停止錄製";
             recordBtn.classList.add("recording");
-            statusRecording.textContent = "錄製中";
+            statusRecording.textContent = "錄製中（" + recordFormatLabel(selectedMimeType) + "）";
 
             if (video.paused || video.ended) {
                 showError("提醒：目前影片沒有在播放，錄下來會是靜止畫面。請按「播放」後再錄製。");
