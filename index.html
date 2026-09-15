@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.7　最後更新：2026-09-15 15:24
+  版本：v1.8　最後更新：2026-09-15 15:33
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -429,7 +429,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.7　最後更新 2026-09-15 15:24</span><br />
+            <span class="version">版本 v1.8　最後更新 2026-09-15 15:33</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -1354,28 +1354,39 @@
             console.error("影片錯誤:", e, err);
         });
 
-        // === 提供給 HTML 按鈕呼叫的控制函式 ===
-        window.togglePlay = async function () {
-            if (video.paused || video.ended) {
-                hideError();
-                try {
-                    await video.play();
-                } catch (e) {
-                    showError("播放失敗：" + e.message);
-                    console.error("播放錯誤:", e);
-                }
-            } else {
-                video.pause();
-            }
-        };
-
-        window.resetVideo = function () {
+        // 回到影片開頭時，前一輪的軌跡與濾波狀態都要歸零，
+        // 否則新一輪的線會直接疊在舊的上面
+        function rewindToStart() {
             stopDetectLoop();
             clearCanvas();
             clearAllTraces();
             resetSmoothing();
             lastLandmarks = null;
             video.currentTime = 0;
+        }
+
+        // === 提供給 HTML 按鈕呼叫的控制函式 ===
+        window.togglePlay = async function () {
+            if (!video.paused && !video.ended) {
+                video.pause();
+                return;
+            }
+
+            // 播完之後再按播放會從頭開始，軌跡必須跟著重來；
+            // 播到一半暫停後再播則是接續，不能清除
+            if (video.ended) rewindToStart();
+
+            hideError();
+            try {
+                await video.play();
+            } catch (e) {
+                showError("播放失敗：" + e.message);
+                console.error("播放錯誤:", e);
+            }
+        };
+
+        window.resetVideo = function () {
+            rewindToStart();
             video.play()
                 .then(() => {
                     setPlaybackStatus("播放中");
