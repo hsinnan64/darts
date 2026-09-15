@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v1.8　最後更新：2026-09-15 15:33
+  版本：v1.9　最後更新：2026-09-15 15:41
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -429,7 +429,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v1.8　最後更新 2026-09-15 15:33</span><br />
+            <span class="version">版本 v1.9　最後更新 2026-09-15 15:41</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -755,6 +755,26 @@
             state.prevPoint = { x: lm.x, y: lm.y };
         }
 
+        // 手腕、手肘、肩膀都畫投擲手那一側；換手時這三條要一起丟棄重來
+        const HAND_DEPENDENT_TRACES = ["wrist", "elbow", "shoulder"];
+
+        // 影片剛開始時兩手的累積移動量都接近 0，單純比大小會在兩邊反覆跳，
+        // 軌跡就會一直被清空。所以一旦定了投擲手，要另一手明顯動得更多才改判。
+        const DOMINANT_SWITCH_MARGIN = 1.25;
+
+        function decideDominantHand() {
+            const right = handStates.right.moveAmount;
+            const left = handStates.left.moveAmount;
+            if (dominantHand === null) return right >= left ? "right" : "left";
+
+            const current = handStates[dominantHand].moveAmount;
+            const other = dominantHand === "right" ? left : right;
+            if (other > current * DOMINANT_SWITCH_MARGIN) {
+                return dominantHand === "right" ? "left" : "right";
+            }
+            return dominantHand;
+        }
+
         function updateTraces(landmarks) {
             if (!landmarks || !Array.isArray(landmarks)) return;
 
@@ -763,10 +783,13 @@
             accumulateMovement(handStates.left, leftWrist);
             accumulateMovement(handStates.right, rightWrist);
 
-            const hand = handStates.right.moveAmount >= handStates.left.moveAmount ? "right" : "left";
+            const hand = decideDominantHand();
             if (hand !== dominantHand) {
+                // 換手代表先前累積的是另一隻手的軌跡，必須整條丟掉，
+                // 否則畫面上會從對側拉一條長線過來（頭部不依賴投擲手，所以不受影響）
                 dominantHand = hand;
                 statusHand.textContent = hand === "right" ? "右手" : "左手";
+                for (const key of HAND_DEPENDENT_TRACES) traces[key].points.length = 0;
             }
 
             // 手肘與肩膀都追蹤投擲手同側，方便和手臂動作直接對照
