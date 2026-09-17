@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.7　最後更新：2026-09-17 14:43
+  版本：v2.8　最後更新：2026-09-17 14:52
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -33,31 +33,28 @@
         }
 
         /* 語言切換：固定在畫面右上角，不隨捲動位置改變 */
-        /* 定位在 .container 右上角（絕對定位，父層需 position:relative），
-           不是釘在整個瀏覽器視窗右上角 —— 寬螢幕時視窗跟卡片中間有大片留白，
-           釘在視窗角落會讓語言鈕離標題很遠，看起來像是兩個不相干的東西。 */
+        /* 放在白色卡片「外面」正上方，跟卡片同寬、同樣置中，靠右對齊——
+           跟著卡片走但不疊在卡片裡面，不管視窗多寬都跟卡片右邊緣切齊，
+           也完全不會跟卡片內的標題/按鈕重疊，不需要再處理重疊斷點。 */
         .lang-switch {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            z-index: 100;
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-end;
             gap: 4px;
-            /* 以卡片寬度（不是視窗寬度）為準，未來語言變多時用換行而不是擠出卡片或蓋住內容 */
-            max-width: calc(100% - 20px);
-            background: rgba(255,255,255,0.85);
-            backdrop-filter: blur(4px);
-            padding: 4px;
-            border-radius: 14px;
-            box-shadow: 0 1px 4px rgba(15,23,42,0.15);
+            max-width: 960px;
+            width: 100%;
+            margin: 0 auto 8px;
+            padding: 0 4px;
         }
 
         .lang-btn {
             border: none;
             border-radius: 999px;
-            background: transparent;
+            /* 現在是站在頁面的漸層背景上（不是疊在白卡片上面），
+               每顆按鈕自己要有底色才看得清楚，不能再依賴外層容器的背景 */
+            background: rgba(255,255,255,0.75);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 1px 4px rgba(15,23,42,0.12);
             color: #475569;
             font-size: 12px;
             font-weight: 600;
@@ -82,14 +79,10 @@
         }
 
         .container {
-            position: relative; /* 讓 .lang-switch 的絕對定位以這裡為基準，而不是整個視窗 */
             background: #f9fbff;
             border-radius: 20px;
             box-shadow: 0 8px 24px rgba(15,23,42,0.10);
             padding: 20px 16px 18px;
-            /* 卡片較窄時標題（尤其英文/韓文較長的翻譯）會撞到右上角的語言切換鈕，
-               維持較大的頂部留白，直到 768px 那個斷點卡片才夠寬能並排 */
-            padding-top: 56px;
             max-width: 960px;
             width: 100%;
         }
@@ -434,11 +427,12 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 按鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生；放在 .container 裡面
-             才能用絕對定位貼著卡片右上角，而不是貼著整個瀏覽器視窗右上角 -->
-        <div class="lang-switch" id="langSwitch"></div>
+    <!-- 按鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生。
+         刻意放在 .container 外面、卡片正上方：跟卡片同寬、置中、靠右對齊，
+         這樣語言鈕在白色卡片的外側，不會疊在卡片內容上面。 -->
+    <div class="lang-switch" id="langSwitch"></div>
 
+    <div class="container">
         <h1 data-i18n="appTitle">飛鏢投擲骨架分析器</h1>
 
         <!-- 主控制區：播放相關，常駐可見 -->
@@ -566,7 +560,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.7</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-17 14:43</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.8</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-17 14:52</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
