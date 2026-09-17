@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.2　最後更新：2026-09-17 11:18
+  版本：v2.3　最後更新：2026-09-17 11:48
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -510,17 +510,17 @@
         </div>
 
         <!--
-          頁尾連結：目前隱藏中。
-          要對外開放贊助頁與隱私權政策頁時，把下面這行的 hidden 拿掉即可。
+          頁尾連結：隱私權政策已開放；贊助頁連結仍是佔位符（見 sponsor.html 頂部提示），
+          等實際贊助連結填好、頁面上傳後，把下面 sponsorSep / sponsorLink 的 hidden 拿掉即可。
         -->
-        <nav class="site-links" id="siteLinks" hidden>
-            <a href="sponsor.html">贊助支持</a>
-            <span class="link-sep">·</span>
+        <nav class="site-links" id="siteLinks">
             <a href="privacy.html">隱私權政策</a>
+            <span class="link-sep" id="sponsorSep" hidden>·</span>
+            <a href="sponsor.html" id="sponsorLink" hidden>贊助支持</a>
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v2.2　最後更新 2026-09-17 11:18</span><br />
+            <span class="version">版本 v2.3　最後更新 2026-09-17 11:48</span><br />
             版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
