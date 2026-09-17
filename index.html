@@ -2,13 +2,13 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.1　最後更新：2026-09-17 11:01
+  版本：v2.2　最後更新：2026-09-17 11:18
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
 
-  版權所有 © 2026 hsinnan64. 保留一切權利。
-  Copyright © 2026 hsinnan64. All Rights Reserved.
+  版權所有 © 2026 葉信男 YEH HSIN NAN. 保留一切權利。
+  Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
 
   未經著作權人書面授權，不得重製、散布、公開傳輸、改作或進行商業利用。
   Unauthorized copying, distribution, modification, or commercial use is prohibited.
@@ -23,8 +23,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>飛鏢投擲骨架分析器</title>
-    <meta name="author" content="hsinnan64" />
-    <meta name="copyright" content="Copyright © 2026 hsinnan64. All Rights Reserved." />
+    <meta name="author" content="葉信男 YEH HSIN NAN" />
+    <meta name="copyright" content="Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved." />
     <style>
         * {
             margin: 0;
@@ -520,8 +520,8 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v2.1　最後更新 2026-09-17 11:01</span><br />
-            版權所有 © 2026 hsinnan64．保留一切權利<br />
+            <span class="version">版本 v2.2　最後更新 2026-09-17 11:18</span><br />
+            版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
     </div>
@@ -627,9 +627,11 @@
             if (FAST_LIMB_INDICES.has(idx)) {
                 // 手肘/手腕：beta 決定「動得越快、濾波越弱」的自適應強度。
                 // 曾經為了壓抖動把 beta 降到 0.05，等於關掉自適應，
-                // 出手這種高速動作的延遲量到 667ms，肉眼就是慢一拍。
+                // 出手這種高速動作的延遲一度到 667ms，肉眼明顯慢一拍。
+                // 目前參數量測延遲約 67ms（2 幀，已接近偵測本身 30fps 的物理下限），
+                // 換來的代價是靜止時抖動從 2.6px 升到 3.6px（720p），仍在骨架點半徑 7px 內。
                 // 跳點是靠離群值拒絕與中位數濾波處理的，不該由 beta 承擔。
-                return { minCutoff: 1.0, beta: 0.7, dCutoff: 1.0 };
+                return { minCutoff: 2.0, beta: 2.5, dCutoff: 1.0 };
             }
             return { minCutoff: 0.8, beta: 0.2, dCutoff: 1.0 };
         }
@@ -1119,14 +1121,11 @@
             }
 
             if (!poseLandmarker || !modelReady) return;
-            if (!skeletonEnabled) {
-                // 骨架關閉時仍然把已記錄的軌跡畫出來
-                drawTraces();
-                return;
-            }
 
             try {
-                // 2. 每個新影片幀都做一次偵測，避免節流造成的階梯式跳動
+                // 2. 每個新影片幀都做一次偵測，避免節流造成的階梯式跳動。
+                //    偵測永遠執行、不受「骨架顯示」開關影響 —— 軌跡需要持續拿到新座標
+                //    才能一直畫下去；骨架開關只決定要不要疊上骨架線段，兩者互不相干。
                 const result = poseLandmarker.detectForVideo(video, now);
                 if (result.landmarks && result.landmarks.length > 0) {
                     lastLandmarks = smoothLandmarks(result.landmarks[0], now);
@@ -1135,7 +1134,7 @@
                 }
 
                 drawTraces();
-                if (lastLandmarks) drawSkeleton(lastLandmarks);
+                if (skeletonEnabled && lastLandmarks) drawSkeleton(lastLandmarks);
             } catch (e) {
                 console.error("detectForVideo 錯誤:", e);
             }
