@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.0　最後更新：2026-09-15 15:47
+  版本：v2.1　最後更新：2026-09-17 11:01
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡顯示的版本與日期
@@ -66,24 +66,19 @@
             letter-spacing: 0.5px;
         }
 
-        /* 按鈕區：手機與平板 3 欄 → 桌機 5 欄 */
+        /* 主控制區：只剩 4 個常駐按鈕（選擇影片/播放/重播/錄製），手機 2 欄、桌機 4 欄一排 */
         .controls {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
             max-width: 860px;
-            margin: 8px auto 14px;
+            margin: 8px auto 10px;
         }
 
         @media (min-width: 480px) {
             .controls {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
                 gap: 10px;
-            }
-        }
-
-        @media (min-width: 768px) {
-            .controls {
-                grid-template-columns: repeat(5, minmax(0, 1fr));
             }
         }
 
@@ -147,27 +142,6 @@
             color: #1e3a8a;
         }
 
-        /* 四個軌跡按鈕的底色，對應畫面上各自的軌跡顏色 */
-        .wrist-trace-btn {
-            background: #fca5a5;
-            color: #7f1d1d;
-        }
-
-        .elbow-trace-btn {
-            background: #bbf7d0;
-            color: #14532d;
-        }
-
-        .head-trace-btn {
-            background: #fde68a;
-            color: #78350f;
-        }
-
-        .shoulder-trace-btn {
-            background: #a5d8f3;
-            color: #0c4a6e;
-        }
-
         /* 純黑背景：深灰 */
         .blackbg-btn {
             background: #475569;
@@ -195,6 +169,89 @@
             transform: translateY(-1px);
             box-shadow: 0 3px 8px rgba(15,23,42,0.18);
             opacity: 0.96;
+        }
+
+        /* 顯示設定：收合式，展開後放骨架/背景切換與軌跡多選 */
+        .settings-toggle {
+            display: block;
+            width: 100%;
+            max-width: 860px;
+            margin: 0 auto 10px;
+            border: none;
+            border-radius: 12px;
+            background: #eef2ff;
+            color: #1e3a8a;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 9px 14px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .settings-toggle:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .settings-chevron {
+            display: inline-block;
+            transition: transform 0.15s;
+        }
+
+        .settings-toggle[aria-expanded="true"] .settings-chevron {
+            transform: rotate(180deg);
+        }
+
+        .settings-panel {
+            max-width: 860px;
+            margin: 0 auto 10px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .settings-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .trace-select-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e3a8a;
+            margin-bottom: 8px;
+        }
+
+        .trace-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 4px;
+            font-size: 14px;
+            color: #1f2937;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .trace-option:last-child {
+            border-bottom: none;
+        }
+
+        .trace-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #1d4ed8;
+        }
+
+        .trace-swatch {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
         }
 
         .canvas-container {
@@ -338,25 +395,59 @@
     <div class="container">
         <h1>飛鏢投擲骨架分析器</h1>
 
-        <!-- 控制區：RWD -->
+        <!-- 主控制區：播放相關，常駐可見 -->
         <div class="controls" id="controls">
             <button class="control-btn upload-btn" id="uploadBtn">
                 選擇影片
             </button>
             <input type="file" id="fileInput" accept="video/*" style="display:none;" />
 
-            <!-- 桌機 5 欄時，第一排是控制類、第二排剛好是四條軌跡加錄製 -->
             <button class="control-btn play-btn" id="playPauseBtn" onclick="togglePlay()" disabled>播放</button>
             <button class="control-btn reset-btn" id="resetBtn" onclick="resetVideo()" disabled>重新播放</button>
-            <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()" disabled>背景：影片</button>
-            <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()" disabled>骨架：開</button>
-
-            <button class="control-btn wrist-trace-btn" id="toggleWristTraceBtn" onclick="toggleWristTrace()" disabled>手腕：開</button>
-            <button class="control-btn elbow-trace-btn" id="toggleElbowTraceBtn" onclick="toggleElbowTrace()" disabled>手肘：開</button>
-            <button class="control-btn head-trace-btn" id="toggleHeadTraceBtn" onclick="toggleHeadTrace()" disabled>頭部：開</button>
-            <button class="control-btn shoulder-trace-btn" id="toggleShoulderTraceBtn" onclick="toggleShoulderTrace()" disabled>肩膀：開</button>
-
             <button class="control-btn record-btn" id="recordBtn" onclick="toggleRecording()" disabled>開始錄製</button>
+        </div>
+
+        <!-- 顯示設定：骨架/背景/軌跡，收合式，預設收起 -->
+        <button
+            class="settings-toggle"
+            id="settingsToggleBtn"
+            onclick="toggleSettingsPanel()"
+            aria-expanded="false"
+            aria-controls="settingsPanel"
+            disabled
+        >
+            顯示設定 <span class="settings-chevron" id="settingsChevron">▾</span>
+        </button>
+
+        <div class="settings-panel" id="settingsPanel" hidden>
+            <div class="settings-buttons">
+                <button class="control-btn toggle-btn" id="toggleSkeletonBtn" onclick="toggleSkeleton()">骨架：開</button>
+                <button class="control-btn blackbg-btn" id="toggleBlackBgBtn" onclick="toggleBlackBg()">背景：影片</button>
+            </div>
+
+            <div class="trace-select">
+                <div class="trace-select-title">軌跡顯示 <span id="traceSummary">(4/4)</span></div>
+                <label class="trace-option">
+                    <input type="checkbox" id="traceCheckWrist" checked onchange="onTraceCheckboxChange('wrist', this)" />
+                    <span class="trace-swatch" style="background: rgb(255,60,60)"></span>
+                    手腕
+                </label>
+                <label class="trace-option">
+                    <input type="checkbox" id="traceCheckElbow" checked onchange="onTraceCheckboxChange('elbow', this)" />
+                    <span class="trace-swatch" style="background: rgb(140,255,120)"></span>
+                    手肘
+                </label>
+                <label class="trace-option">
+                    <input type="checkbox" id="traceCheckHead" checked onchange="onTraceCheckboxChange('head', this)" />
+                    <span class="trace-swatch" style="background: rgb(255,215,70)"></span>
+                    頭部
+                </label>
+                <label class="trace-option">
+                    <input type="checkbox" id="traceCheckShoulder" checked onchange="onTraceCheckboxChange('shoulder', this)" />
+                    <span class="trace-swatch" style="background: rgb(80,210,255)"></span>
+                    肩膀
+                </label>
+            </div>
         </div>
 
         <div id="loadingText" class="loading" style="display:none;">
@@ -429,7 +520,7 @@
         </nav>
 
         <footer class="copyright">
-            <span class="version">版本 v2.0　最後更新 2026-09-15 15:47</span><br />
+            <span class="version">版本 v2.1　最後更新 2026-09-17 11:01</span><br />
             版權所有 © 2026 hsinnan64．保留一切權利<br />
             姿態辨識由 Google MediaPipe 提供（Apache License 2.0）
         </footer>
@@ -452,12 +543,19 @@
         const playPauseBtn = document.getElementById("playPauseBtn");
         const resetBtn = document.getElementById("resetBtn");
         const toggleSkeletonBtn = document.getElementById("toggleSkeletonBtn");
-        const toggleWristTraceBtn = document.getElementById("toggleWristTraceBtn");
-        const toggleElbowTraceBtn = document.getElementById("toggleElbowTraceBtn");
-        const toggleHeadTraceBtn = document.getElementById("toggleHeadTraceBtn");
-        const toggleShoulderTraceBtn = document.getElementById("toggleShoulderTraceBtn");
         const toggleBlackBgBtn = document.getElementById("toggleBlackBgBtn");
         const recordBtn = document.getElementById("recordBtn");
+
+        const settingsToggleBtn = document.getElementById("settingsToggleBtn");
+        const settingsPanel = document.getElementById("settingsPanel");
+        const settingsChevron = document.getElementById("settingsChevron");
+        const traceSummary = document.getElementById("traceSummary");
+        const traceCheckboxes = {
+            wrist: document.getElementById("traceCheckWrist"),
+            elbow: document.getElementById("traceCheckElbow"),
+            head: document.getElementById("traceCheckHead"),
+            shoulder: document.getElementById("traceCheckShoulder")
+        };
 
         const statusPlayback = document.getElementById("statusPlayback");
         const statusModel = document.getElementById("statusModel");
@@ -1329,13 +1427,8 @@
 
             playPauseBtn.disabled = false;
             resetBtn.disabled = false;
-            toggleSkeletonBtn.disabled = false;
-            toggleWristTraceBtn.disabled = false;
-            toggleElbowTraceBtn.disabled = false;
-            toggleHeadTraceBtn.disabled = false;
-            toggleShoulderTraceBtn.disabled = false;
-            toggleBlackBgBtn.disabled = false;
             recordBtn.disabled = false;
+            settingsToggleBtn.disabled = false;
 
             video.currentTime = 0;
             clearCanvas();
@@ -1433,29 +1526,27 @@
             }
         };
 
-        // 關閉某條軌跡時只清掉它自己的點，其他兩條不受影響
-        function toggleTrace(key, btn, label) {
+        // 四條軌跡合併成「顯示設定」裡的勾選清單，checkbox 已經是使用者按下後的新狀態，
+        // 這裡只要讀值同步，不再用「翻轉」邏輯（翻轉容易跟畫面顯示的勾選狀態不一致）
+        window.onTraceCheckboxChange = function (key, checkboxEl) {
             const trace = traces[key];
-            trace.enabled = !trace.enabled;
+            trace.enabled = checkboxEl.checked;
             if (!trace.enabled) trace.points.length = 0;
-            btn.textContent = label + (trace.enabled ? "：開" : "：關");
             updateTraceStatus();
+            updateTraceSummary();
+        };
+
+        function updateTraceSummary() {
+            const total = Object.keys(traces).length;
+            const enabledCount = Object.values(traces).filter((t) => t.enabled).length;
+            traceSummary.textContent = `(${enabledCount}/${total})`;
         }
 
-        window.toggleWristTrace = function () {
-            toggleTrace("wrist", toggleWristTraceBtn, "手腕");
-        };
-
-        window.toggleElbowTrace = function () {
-            toggleTrace("elbow", toggleElbowTraceBtn, "手肘");
-        };
-
-        window.toggleHeadTrace = function () {
-            toggleTrace("head", toggleHeadTraceBtn, "頭部");
-        };
-
-        window.toggleShoulderTrace = function () {
-            toggleTrace("shoulder", toggleShoulderTraceBtn, "肩膀");
+        window.toggleSettingsPanel = function () {
+            const willOpen = settingsPanel.hidden;
+            settingsPanel.hidden = !willOpen;
+            settingsToggleBtn.setAttribute("aria-expanded", String(willOpen));
+            settingsChevron.textContent = willOpen ? "▴" : "▾";
         };
 
         window.toggleBlackBg = function () {
