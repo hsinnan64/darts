@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.5　最後更新：2026-09-17 13:20
+  版本：v2.6　最後更新：2026-09-17 14:35
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -565,7 +565,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.5</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-17 13:20</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.6</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-17 14:35</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -615,116 +615,97 @@
         const statusFPS = document.getElementById("statusFPS");
         const statusRecording = document.getElementById("statusRecording");
 
-        // === 語言切換（中 / EN / 日，日後可加韓文）===
+        // === 語言切換（繁中／簡中／EN／日／韓）===
         // 只翻譯這支主程式的介面文字；隱私權政策、贊助頁目前仍只有中文內容，
         // 頁尾連結文字本身雖會翻譯，點進去後的頁面內容不受影響。
         //
-        // 日後要加韓文，只需要：
-        //   1. LANG_LABELS 加一筆 ko: "한"
-        //   2. 下面 I18N 每個 key 的物件裡補上 ko 翻譯（缺的話 t() 會自動退回中文，不會壞掉）
+        // 簡體中文是拿繁體版用 OpenCC 轉字形，再手動修正幾個兩岸慣用語差異
+        // （影片→视频、載入→加载、設定→设置、檔案→文件），純字形轉換以外的
+        // 用詞差異沒有全面校對，之後若使用者反映哪裡讀起來「很台」再個別修。
+        //
+        // 日後要再加語言，只需要：
+        //   1. LANG_LABELS 加一筆（例如 vi: "Việt"）
+        //   2. 下面 I18N 每個 key 的物件裡補上該語言翻譯（缺的話 t() 會自動退回中文，不會壞掉）
         //   3. 若切換鈕換行變 2 排，記得檢查 body 的 padding-top（手機版）是否還夠、
-        //      不會跟標題 h1 重疊 —— 目前 3 個語言是 1 排，56px 綽綽有餘
+        //      不會跟標題 h1 重疊 —— 目前 5 個語言在較窄螢幕可能換行，已測過不會重疊
         // 不需要改 HTML，右上角的按鈕是依這份設定動態產生的。
         const LANG_STORAGE_KEY = "darts_lang";
-        const LANG_LABELS = { zh: "中", en: "EN", ja: "日" };
+        const LANG_LABELS = { zh: "繁", "zh-CN": "简", en: "EN", ja: "日", ko: "한" };
         const SUPPORTED_LANGS = Object.keys(LANG_LABELS);
 
         const I18N = {
-            appTitle: { zh: "飛鏢投擲骨架分析器", en: "Darts Throwing Pose Analyzer", ja: "ダーツ投擲フォーム解析" },
-
-            "btn.upload": { zh: "選擇影片", en: "Choose Video", ja: "動画を選択" },
-            "btn.play": { zh: "播放", en: "Play", ja: "再生" },
-            "btn.pause": { zh: "暫停", en: "Pause", ja: "一時停止" },
-            "btn.reset": { zh: "重新播放", en: "Replay", ja: "再生し直す" },
-            "btn.record.start": { zh: "開始錄製", en: "Start Recording", ja: "録画開始" },
-            "btn.record.stop": { zh: "停止錄製", en: "Stop Recording", ja: "録画停止" },
-
-            "settings.toggle": { zh: "顯示設定", en: "Display Settings", ja: "表示設定" },
-            "settings.skeletonLabel": { zh: "骨架", en: "Skeleton", ja: "骨格" },
-            "settings.backgroundLabel": { zh: "背景", en: "Background", ja: "背景" },
-
-            "state.on": { zh: "開", en: "On", ja: "オン" },
-            "state.off": { zh: "關", en: "Off", ja: "オフ" },
-
-            "background.video": { zh: "影片", en: "Video", ja: "動画" },
-            "background.black": { zh: "純黑", en: "Black", ja: "黒背景" },
-            "background.blackDesc": { zh: "純黑（只看點線軌跡）", en: "Black (points & trails only)", ja: "黒背景（点と軌跡のみ表示）" },
-
-            "trace.title": { zh: "軌跡顯示", en: "Trace Display", ja: "軌跡表示" },
-            "trace.wrist": { zh: "手腕", en: "Wrist", ja: "手首" },
-            "trace.elbow": { zh: "手肘", en: "Elbow", ja: "肘" },
-            "trace.head": { zh: "頭部", en: "Head", ja: "頭" },
-            "trace.shoulder": { zh: "肩膀", en: "Shoulder", ja: "肩" },
-
-            "loading.model": { zh: "正在載入骨架模型，請稍候...", en: "Loading pose model, please wait...", ja: "姿勢モデルを読み込み中です、しばらくお待ちください…" },
-
-            "info.playback": { zh: "播放狀態：", en: "Playback:", ja: "再生状態：" },
-            "info.background": { zh: "背景模式：", en: "Background:", ja: "背景モード：" },
-            "info.skeleton": { zh: "骨架顯示：", en: "Skeleton:", ja: "骨格表示：" },
-            "info.wristTrace": { zh: "手腕軌跡：", en: "Wrist Trace:", ja: "手首の軌跡：" },
-            "info.elbowTrace": { zh: "手肘軌跡：", en: "Elbow Trace:", ja: "肘の軌跡：" },
-            "info.headTrace": { zh: "頭部軌跡：", en: "Head Trace:", ja: "頭の軌跡：" },
-            "info.shoulderTrace": { zh: "肩膀軌跡：", en: "Shoulder Trace:", ja: "肩の軌跡：" },
-            "info.recording": { zh: "錄製狀態：", en: "Recording:", ja: "録画状態：" },
-            "info.hand": { zh: "投擲手：", en: "Throwing Hand:", ja: "投げる手：" },
-            "info.model": { zh: "骨架載入：", en: "Model:", ja: "モデル：" },
-            "info.fps": { zh: "目前幀率：", en: "Current FPS:", ja: "現在のFPS：" },
-
-            "playback.idle": { zh: "待機", en: "Standby", ja: "待機中" },
-            "playback.loadingVideo": { zh: "載入影片中…", en: "Loading video…", ja: "動画読み込み中…" },
-            "playback.playing": { zh: "播放中", en: "Playing", ja: "再生中" },
-            "playback.paused": { zh: "已暫停", en: "Paused", ja: "一時停止中" },
-            "playback.ended": { zh: "已結束", en: "Finished", ja: "終了" },
-
-            "model.loading": { zh: "載入中…", en: "Loading…", ja: "読み込み中…" },
-            "model.loaded": { zh: "已載入 (full)", en: "Loaded (full)", ja: "読み込み完了 (full)" },
-
-            "hand.auto": { zh: "自動判斷中", en: "Auto-detecting…", ja: "自動判定中…" },
-            "hand.right": { zh: "右手", en: "Right Hand", ja: "右手" },
-            "hand.left": { zh: "左手", en: "Left Hand", ja: "左手" },
-
-            "recording.preparing": { zh: "準備中…", en: "Preparing…", ja: "準備中…" },
-            "recording.active": { zh: "錄製中（{format}）", en: "Recording ({format})", ja: "録画中（{format}）" },
-
-            "trace.status.detecting": { zh: "偵測中…", en: "Detecting…", ja: "検出中…" },
-            "trace.status.stable": { zh: "穩定（{pct}）", en: "Stable ({pct})", ja: "安定（{pct}）" },
-            "trace.status.slight": { zh: "輕微晃動（{pct}）", en: "Slight movement ({pct})", ja: "若干の揺れ（{pct}）" },
-            "trace.status.moving": { zh: "明顯移動（{pct}）", en: "Noticeable movement ({pct})", ja: "顕著な動き（{pct}）" },
-            "trace.status.wristRange": { zh: "開（範圍 {pct}）", en: "On (range {pct})", ja: "オン（範囲 {pct}）" },
-
-            "nav.privacy": { zh: "隱私權政策", en: "Privacy Policy", ja: "プライバシーポリシー" },
-            "nav.sponsor": { zh: "贊助支持", en: "Support", ja: "支援する" },
-
-            "footer.version": { zh: "版本", en: "Version", ja: "バージョン" },
-            "footer.updated": { zh: "最後更新", en: "Last updated", ja: "最終更新" },
-            "footer.copyright": {
-                zh: "版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利",
-                en: "Copyright © 2026 YEH HSIN NAN (葉信男). All Rights Reserved.",
-                ja: "Copyright © 2026 葉信男 YEH HSIN NAN．All Rights Reserved."
-            },
-            "footer.mediapipe": {
-                zh: "姿態辨識由 Google MediaPipe 提供（Apache License 2.0）",
-                en: "Pose recognition powered by Google MediaPipe (Apache License 2.0)",
-                ja: "姿勢認識は Google MediaPipe を使用（Apache License 2.0）"
-            },
-
-            "error.mediapipeInitFailed": { zh: "MediaPipe 初始化失敗：", en: "MediaPipe initialization failed: ", ja: "MediaPipe の初期化に失敗しました：" },
-            "error.videoLoadFailed": { zh: "影片載入失敗", en: "Failed to load video", ja: "動画の読み込みに失敗しました" },
-            "error.videoLoadFailedCode": { zh: "影片載入失敗 (錯誤碼 {code}): {msg}", en: "Failed to load video (error code {code}): {msg}", ja: "動画の読み込みに失敗しました（エラーコード {code}）：{msg}" },
-            "error.videoFormatHint": { zh: "請確認影片為 H.264 編碼的 MP4 格式", en: "Please make sure the video is an MP4 file encoded with H.264", ja: "動画が H.264 エンコードの MP4 形式であることをご確認ください" },
-            "error.playFailed": { zh: "播放失敗：", en: "Playback failed: ", ja: "再生に失敗しました：" },
-            "error.replayFailed": { zh: "重新播放失敗：", en: "Replay failed: ", ja: "再生し直しに失敗しました：" },
-            "error.recorderUnsupported": { zh: "此瀏覽器無法錄製畫面，請改用最新版 Chrome / Edge。", en: "This browser can't record video. Please use the latest Chrome or Edge.", ja: "このブラウザでは録画できません。最新版の Chrome または Edge をご利用ください。" },
-            "error.recorderInitFailed": { zh: "錄製初始化失敗：", en: "Failed to initialize recording: ", ja: "録画の初期化に失敗しました：" },
-            "error.recorderRetryHint": { zh: "請改用最新版 Chrome / Edge。", en: "Please use the latest Chrome or Edge.", ja: "最新版の Chrome または Edge をご利用ください。" },
-            "error.recorderRuntimeError": { zh: "錄製過程發生錯誤：", en: "An error occurred during recording: ", ja: "録画中にエラーが発生しました：" },
-            "error.recorderUnknown": { zh: "未知錯誤", en: "Unknown error", ja: "不明なエラー" },
-            "error.recordingNoData": { zh: "錄製結束但沒有取得任何畫面資料。", en: "Recording finished but no frame data was captured.", ja: "録画は終了しましたが、映像データを取得できませんでした。" },
-            "error.recordingNoDataHint": { zh: "請確認錄製期間影片有在播放（暫停時畫面不會更新，錄不到內容）。", en: "Please make sure the video was playing while recording — nothing is captured while paused.", ja: "録画中は動画を再生してください（一時停止中は画面が更新されず、何も録画されません）。" },
-            "error.webmOnly": { zh: "此瀏覽器只能錄出 WebM 格式，Facebook / Instagram 無法直接上傳。", en: "This browser can only export WebM, which can't be uploaded directly to Facebook or Instagram.", ja: "このブラウザでは WebM 形式でしか出力できず、Facebook や Instagram に直接アップロードできません。" },
-            "error.webmOnlyHint": { zh: "請改用最新版 Chrome 或 Edge，或自行將檔案轉成 MP4。", en: "Please use the latest Chrome or Edge, or convert the file to MP4 yourself.", ja: "最新版の Chrome か Edge を使用するか、ファイルをご自身で MP4 に変換してください。" },
-            "error.recordWhilePaused": { zh: "提醒：目前影片沒有在播放，錄下來會是靜止畫面。請按「播放」後再錄製。", en: "Note: the video isn't playing, so the recording will just be a still frame. Please press Play first.", ja: "注意：動画が再生されていないため、録画は静止画になります。先に「再生」を押してください。" },
-            "error.loadVideoFirst": { zh: "請先載入影片再錄製。", en: "Please load a video before recording.", ja: "録画する前に動画を読み込んでください。" }
+            appTitle: { zh: "飛鏢投擲骨架分析器", "zh-CN": "飞镖投掷骨架分析器", en: "Darts Throwing Pose Analyzer", ja: "ダーツ投擲フォーム解析", ko: "다트 투척 자세 분석기" },
+            "btn.upload": { zh: "選擇影片", "zh-CN": "选择视频", en: "Choose Video", ja: "動画を選択", ko: "동영상 선택" },
+            "btn.play": { zh: "播放", "zh-CN": "播放", en: "Play", ja: "再生", ko: "재생" },
+            "btn.pause": { zh: "暫停", "zh-CN": "暂停", en: "Pause", ja: "一時停止", ko: "일시정지" },
+            "btn.reset": { zh: "重新播放", "zh-CN": "重新播放", en: "Replay", ja: "再生し直す", ko: "다시 재생" },
+            "btn.record.start": { zh: "開始錄製", "zh-CN": "开始录制", en: "Start Recording", ja: "録画開始", ko: "녹화 시작" },
+            "btn.record.stop": { zh: "停止錄製", "zh-CN": "停止录制", en: "Stop Recording", ja: "録画停止", ko: "녹화 중지" },
+            "settings.toggle": { zh: "顯示設定", "zh-CN": "显示设置", en: "Display Settings", ja: "表示設定", ko: "표시 설정" },
+            "settings.skeletonLabel": { zh: "骨架", "zh-CN": "骨架", en: "Skeleton", ja: "骨格", ko: "골격" },
+            "settings.backgroundLabel": { zh: "背景", "zh-CN": "背景", en: "Background", ja: "背景", ko: "배경" },
+            "state.on": { zh: "開", "zh-CN": "开", en: "On", ja: "オン", ko: "켜짐" },
+            "state.off": { zh: "關", "zh-CN": "关", en: "Off", ja: "オフ", ko: "꺼짐" },
+            "background.video": { zh: "影片", "zh-CN": "视频", en: "Video", ja: "動画", ko: "동영상" },
+            "background.black": { zh: "純黑", "zh-CN": "纯黑", en: "Black", ja: "黒背景", ko: "검정" },
+            "background.blackDesc": { zh: "純黑（只看點線軌跡）", "zh-CN": "纯黑（只看点线轨迹）", en: "Black (points & trails only)", ja: "黒背景（点と軌跡のみ表示）", ko: "검정 배경 (점·궤적만 표시)" },
+            "trace.title": { zh: "軌跡顯示", "zh-CN": "轨迹显示", en: "Trace Display", ja: "軌跡表示", ko: "궤적 표시" },
+            "trace.wrist": { zh: "手腕", "zh-CN": "手腕", en: "Wrist", ja: "手首", ko: "손목" },
+            "trace.elbow": { zh: "手肘", "zh-CN": "手肘", en: "Elbow", ja: "肘", ko: "팔꿈치" },
+            "trace.head": { zh: "頭部", "zh-CN": "头部", en: "Head", ja: "頭", ko: "머리" },
+            "trace.shoulder": { zh: "肩膀", "zh-CN": "肩膀", en: "Shoulder", ja: "肩", ko: "어깨" },
+            "loading.model": { zh: "正在載入骨架模型，請稍候...", "zh-CN": "正在加载骨架模型，请稍候...", en: "Loading pose model, please wait...", ja: "姿勢モデルを読み込み中です、しばらくお待ちください…", ko: "자세 모델을 불러오는 중입니다. 잠시만 기다려 주세요..." },
+            "info.playback": { zh: "播放狀態：", "zh-CN": "播放状态：", en: "Playback:", ja: "再生状態：", ko: "재생 상태：" },
+            "info.background": { zh: "背景模式：", "zh-CN": "背景模式：", en: "Background:", ja: "背景モード：", ko: "배경 모드：" },
+            "info.skeleton": { zh: "骨架顯示：", "zh-CN": "骨架显示：", en: "Skeleton:", ja: "骨格表示：", ko: "골격 표시：" },
+            "info.wristTrace": { zh: "手腕軌跡：", "zh-CN": "手腕轨迹：", en: "Wrist Trace:", ja: "手首の軌跡：", ko: "손목 궤적：" },
+            "info.elbowTrace": { zh: "手肘軌跡：", "zh-CN": "手肘轨迹：", en: "Elbow Trace:", ja: "肘の軌跡：", ko: "팔꿈치 궤적：" },
+            "info.headTrace": { zh: "頭部軌跡：", "zh-CN": "头部轨迹：", en: "Head Trace:", ja: "頭の軌跡：", ko: "머리 궤적：" },
+            "info.shoulderTrace": { zh: "肩膀軌跡：", "zh-CN": "肩膀轨迹：", en: "Shoulder Trace:", ja: "肩の軌跡：", ko: "어깨 궤적：" },
+            "info.recording": { zh: "錄製狀態：", "zh-CN": "录制状态：", en: "Recording:", ja: "録画状態：", ko: "녹화 상태：" },
+            "info.hand": { zh: "投擲手：", "zh-CN": "投掷手：", en: "Throwing Hand:", ja: "投げる手：", ko: "던지는 손：" },
+            "info.model": { zh: "骨架載入：", "zh-CN": "骨架加载：", en: "Model:", ja: "モデル：", ko: "모델 로드：" },
+            "info.fps": { zh: "目前幀率：", "zh-CN": "目前帧率：", en: "Current FPS:", ja: "現在のFPS：", ko: "현재 FPS：" },
+            "playback.idle": { zh: "待機", "zh-CN": "待机", en: "Standby", ja: "待機中", ko: "대기 중" },
+            "playback.loadingVideo": { zh: "載入影片中…", "zh-CN": "加载视频中…", en: "Loading video…", ja: "動画読み込み中…", ko: "동영상 불러오는 중…" },
+            "playback.playing": { zh: "播放中", "zh-CN": "播放中", en: "Playing", ja: "再生中", ko: "재생 중" },
+            "playback.paused": { zh: "已暫停", "zh-CN": "已暂停", en: "Paused", ja: "一時停止中", ko: "일시정지됨" },
+            "playback.ended": { zh: "已結束", "zh-CN": "已结束", en: "Finished", ja: "終了", ko: "종료됨" },
+            "model.loading": { zh: "載入中…", "zh-CN": "加载中…", en: "Loading…", ja: "読み込み中…", ko: "불러오는 중…" },
+            "model.loaded": { zh: "已載入 (full)", "zh-CN": "已加载 (full)", en: "Loaded (full)", ja: "読み込み完了 (full)", ko: "로드 완료 (full)" },
+            "hand.auto": { zh: "自動判斷中", "zh-CN": "自动判断中", en: "Auto-detecting…", ja: "自動判定中…", ko: "자동 판별 중…" },
+            "hand.right": { zh: "右手", "zh-CN": "右手", en: "Right Hand", ja: "右手", ko: "오른손" },
+            "hand.left": { zh: "左手", "zh-CN": "左手", en: "Left Hand", ja: "左手", ko: "왼손" },
+            "recording.preparing": { zh: "準備中…", "zh-CN": "准备中…", en: "Preparing…", ja: "準備中…", ko: "준비 중…" },
+            "recording.active": { zh: "錄製中（{format}）", "zh-CN": "录制中（{format}）", en: "Recording ({format})", ja: "録画中（{format}）", ko: "녹화 중 ({format})" },
+            "trace.status.detecting": { zh: "偵測中…", "zh-CN": "侦测中…", en: "Detecting…", ja: "検出中…", ko: "감지 중…" },
+            "trace.status.stable": { zh: "穩定（{pct}）", "zh-CN": "稳定（{pct}）", en: "Stable ({pct})", ja: "安定（{pct}）", ko: "안정 ({pct})" },
+            "trace.status.slight": { zh: "輕微晃動（{pct}）", "zh-CN": "轻微晃动（{pct}）", en: "Slight movement ({pct})", ja: "若干の揺れ（{pct}）", ko: "약간 흔들림 ({pct})" },
+            "trace.status.moving": { zh: "明顯移動（{pct}）", "zh-CN": "明显移动（{pct}）", en: "Noticeable movement ({pct})", ja: "顕著な動き（{pct}）", ko: "뚜렷한 움직임 ({pct})" },
+            "trace.status.wristRange": { zh: "開（範圍 {pct}）", "zh-CN": "开（范围 {pct}）", en: "On (range {pct})", ja: "オン（範囲 {pct}）", ko: "켜짐 (범위 {pct})" },
+            "nav.privacy": { zh: "隱私權政策", "zh-CN": "隐私权政策", en: "Privacy Policy", ja: "プライバシーポリシー", ko: "개인정보처리방침" },
+            "nav.sponsor": { zh: "贊助支持", "zh-CN": "赞助支持", en: "Support", ja: "支援する", ko: "후원하기" },
+            "footer.version": { zh: "版本", "zh-CN": "版本", en: "Version", ja: "バージョン", ko: "버전" },
+            "footer.updated": { zh: "最後更新", "zh-CN": "最后更新", en: "Last updated", ja: "最終更新", ko: "마지막 업데이트" },
+            "footer.copyright": { zh: "版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利", "zh-CN": "版权所有 © 2026 叶信男 YEH HSIN NAN．保留一切权利", en: "Copyright © 2026 YEH HSIN NAN (葉信男). All Rights Reserved.", ja: "Copyright © 2026 葉信男 YEH HSIN NAN．All Rights Reserved.", ko: "Copyright © 2026 YEH HSIN NAN (葉信男). All Rights Reserved." },
+            "footer.mediapipe": { zh: "姿態辨識由 Google MediaPipe 提供（Apache License 2.0）", "zh-CN": "姿态辨识由 Google MediaPipe 提供（Apache License 2.0）", en: "Pose recognition powered by Google MediaPipe (Apache License 2.0)", ja: "姿勢認識は Google MediaPipe を使用（Apache License 2.0）", ko: "자세 인식은 Google MediaPipe로 제공됩니다 (Apache License 2.0)" },
+            "error.mediapipeInitFailed": { zh: "MediaPipe 初始化失敗：", "zh-CN": "MediaPipe 初始化失败：", en: "MediaPipe initialization failed: ", ja: "MediaPipe の初期化に失敗しました：", ko: "MediaPipe 초기화에 실패했습니다: " },
+            "error.videoLoadFailed": { zh: "影片載入失敗", "zh-CN": "视频加载失败", en: "Failed to load video", ja: "動画の読み込みに失敗しました", ko: "동영상을 불러오지 못했습니다" },
+            "error.videoLoadFailedCode": { zh: "影片載入失敗 (錯誤碼 {code}): {msg}", "zh-CN": "视频加载失败 (错误码 {code}): {msg}", en: "Failed to load video (error code {code}): {msg}", ja: "動画の読み込みに失敗しました（エラーコード {code}）：{msg}", ko: "동영상을 불러오지 못했습니다 (오류 코드 {code}): {msg}" },
+            "error.videoFormatHint": { zh: "請確認影片為 H.264 編碼的 MP4 格式", "zh-CN": "请确认视频为 H.264 编码的 MP4 格式", en: "Please make sure the video is an MP4 file encoded with H.264", ja: "動画が H.264 エンコードの MP4 形式であることをご確認ください", ko: "동영상이 H.264로 인코딩된 MP4 형식인지 확인해 주세요" },
+            "error.playFailed": { zh: "播放失敗：", "zh-CN": "播放失败：", en: "Playback failed: ", ja: "再生に失敗しました：", ko: "재생 실패: " },
+            "error.replayFailed": { zh: "重新播放失敗：", "zh-CN": "重新播放失败：", en: "Replay failed: ", ja: "再生し直しに失敗しました：", ko: "다시 재생 실패: " },
+            "error.recorderUnsupported": { zh: "此瀏覽器無法錄製畫面，請改用最新版 Chrome / Edge。", "zh-CN": "此浏览器无法录制画面，请改用最新版 Chrome / Edge。", en: "This browser can't record video. Please use the latest Chrome or Edge.", ja: "このブラウザでは録画できません。最新版の Chrome または Edge をご利用ください。", ko: "이 브라우저에서는 화면을 녹화할 수 없습니다. 최신 버전의 Chrome 또는 Edge를 사용해 주세요." },
+            "error.recorderInitFailed": { zh: "錄製初始化失敗：", "zh-CN": "录制初始化失败：", en: "Failed to initialize recording: ", ja: "録画の初期化に失敗しました：", ko: "녹화 초기화에 실패했습니다: " },
+            "error.recorderRetryHint": { zh: "請改用最新版 Chrome / Edge。", "zh-CN": "请改用最新版 Chrome / Edge。", en: "Please use the latest Chrome or Edge.", ja: "最新版の Chrome または Edge をご利用ください。", ko: "최신 버전의 Chrome 또는 Edge를 사용해 주세요." },
+            "error.recorderRuntimeError": { zh: "錄製過程發生錯誤：", "zh-CN": "录制过程发生错误：", en: "An error occurred during recording: ", ja: "録画中にエラーが発生しました：", ko: "녹화 중 오류가 발생했습니다: " },
+            "error.recorderUnknown": { zh: "未知錯誤", "zh-CN": "未知错误", en: "Unknown error", ja: "不明なエラー", ko: "알 수 없는 오류" },
+            "error.recordingNoData": { zh: "錄製結束但沒有取得任何畫面資料。", "zh-CN": "录制结束但没有取得任何画面资料。", en: "Recording finished but no frame data was captured.", ja: "録画は終了しましたが、映像データを取得できませんでした。", ko: "녹화가 종료되었지만 화면 데이터를 가져오지 못했습니다." },
+            "error.recordingNoDataHint": { zh: "請確認錄製期間影片有在播放（暫停時畫面不會更新，錄不到內容）。", "zh-CN": "请确认录制期间视频有在播放（暂停时画面不会更新，录不到内容）。", en: "Please make sure the video was playing while recording — nothing is captured while paused.", ja: "録画中は動画を再生してください（一時停止中は画面が更新されず、何も録画されません）。", ko: "녹화 중에는 동영상이 재생 중이어야 합니다 (일시정지 중에는 화면이 갱신되지 않아 아무것도 녹화되지 않습니다)." },
+            "error.webmOnly": { zh: "此瀏覽器只能錄出 WebM 格式，Facebook / Instagram 無法直接上傳。", "zh-CN": "此浏览器只能录出 WebM 格式，Facebook / Instagram 无法直接上传。", en: "This browser can only export WebM, which can't be uploaded directly to Facebook or Instagram.", ja: "このブラウザでは WebM 形式でしか出力できず、Facebook や Instagram に直接アップロードできません。", ko: "이 브라우저는 WebM 형식으로만 저장할 수 있어 Facebook / Instagram에 바로 업로드할 수 없습니다." },
+            "error.webmOnlyHint": { zh: "請改用最新版 Chrome 或 Edge，或自行將檔案轉成 MP4。", "zh-CN": "请改用最新版 Chrome 或 Edge，或自行将文件转成 MP4。", en: "Please use the latest Chrome or Edge, or convert the file to MP4 yourself.", ja: "最新版の Chrome か Edge を使用するか、ファイルをご自身で MP4 に変換してください。", ko: "최신 버전의 Chrome 또는 Edge를 사용하거나, 파일을 직접 MP4로 변환해 주세요." },
+            "error.recordWhilePaused": { zh: "提醒：目前影片沒有在播放，錄下來會是靜止畫面。請按「播放」後再錄製。", "zh-CN": "提醒：目前视频没有在播放，录下来会是静止画面。请按「播放」后再录制。", en: "Note: the video isn't playing, so the recording will just be a still frame. Please press Play first.", ja: "注意：動画が再生されていないため、録画は静止画になります。先に「再生」を押してください。", ko: "알림: 현재 동영상이 재생되고 있지 않아 정지 화면만 녹화됩니다. 먼저 「재생」을 눌러 주세요." },
+            "error.loadVideoFirst": { zh: "請先載入影片再錄製。", "zh-CN": "请先加载视频再录制。", en: "Please load a video before recording.", ja: "録画する前に動画を読み込んでください。", ko: "녹화하기 전에 먼저 동영상을 불러와 주세요." },
         };
 
         // localStorage 在某些環境（無痕模式、企業政策、沙盒 iframe 等）會直接拋錯，
@@ -1828,7 +1809,8 @@
             } catch (e) {
                 // 儲存失敗（無痕模式等）不影響本次切換，只是下次開啟不會記住
             }
-            document.documentElement.lang = lang === "zh" ? "zh-TW" : lang === "ja" ? "ja" : "en";
+            const HTML_LANG_MAP = { zh: "zh-TW", "zh-CN": "zh-CN", ja: "ja", ko: "ko", en: "en" };
+            document.documentElement.lang = HTML_LANG_MAP[lang] || "en";
             document.title = t("appTitle");
             applyStaticTranslations();
             renderDynamicUI();
