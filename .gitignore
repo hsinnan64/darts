@@ -14,3 +14,6 @@ desktop.ini
 
 # 個人技術筆記（含調校參數與踩坑記錄，不對外公開）
 NOTES.md
+
+# 飛鏢物體追蹤可行性測試（方案①顏色追蹤雛型），驗證通過再決定要不要正式納入
+dart-color-tracker-test.html
