@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.18　最後更新：2026-09-19 23:04
+  版本：v2.19　最後更新：2026-09-19 23:06
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -367,6 +367,10 @@
 
         .info-label {
             font-weight: 600;
+            /* 值的內容變多時（例如鏢次圖例有很多色塊），
+               flex 會把標籤壓到換行，所以固定不縮、不斷行 */
+            flex: 0 0 auto;
+            white-space: nowrap;
         }
 
         .info-value {
@@ -599,7 +603,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.18</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 23:04</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.19</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 23:06</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
