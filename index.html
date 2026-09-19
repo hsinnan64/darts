@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.14　最後更新：2026-09-19 16:10
+  版本：v2.15　最後更新：2026-09-19 22:42
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -548,7 +548,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.14</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 16:10</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.15</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:42</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -1001,8 +1001,27 @@
             };
         }
 
+        // 軌跡以「段」為單位保存：手腕低於手肘時會中斷，再舉起就另起一段。
+        // 如果全部點擠在同一個陣列裡，中斷前後會被連成一條實際上不存在的直線
+        // （從上一段結尾直接拉到新段起點），分段就是為了避免這件事。
         function createTrace(color, enabled) {
-            return { points: [], color, enabled };
+            return { segments: [], color, enabled };
+        }
+
+        function clearTrace(trace) {
+            trace.segments.length = 0;
+        }
+
+        // 手腕低於手肘時呼叫：讓下一個點另起一段
+        function breakTrace(trace) {
+            const last = trace.segments[trace.segments.length - 1];
+            if (last && last.length) trace.segments.push([]);
+        }
+
+        function tracePointCount(trace) {
+            let n = 0;
+            for (const seg of trace.segments) n += seg.length;
+            return n;
         }
 
         const traces = {
@@ -1026,11 +1045,12 @@
 
         function clearAllTraces() {
             for (const key of Object.keys(traces)) {
-                traces[key].points.length = 0;
+                clearTrace(traces[key]);
             }
             handStates.left = createHandState();
             handStates.right = createHandState();
             dominantHand = null;
+            accumulating = false;
             throwStarted = false;
             statusHand.textContent = t("hand.auto");
             updateTraceStatus();
@@ -1040,13 +1060,22 @@
             if (!lm) return;
             if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
 
-            const last = trace.points[trace.points.length - 1];
+            if (!trace.segments.length) trace.segments.push([]);
+            const seg = trace.segments[trace.segments.length - 1];
+
+            const last = seg[seg.length - 1];
             if (last) {
                 const d = Math.hypot(lm.x - last.x, lm.y - last.y);
                 if (d < MIN_TRACE_SPACING) return;
             }
-            trace.points.push({ x: lm.x, y: lm.y });
-            if (trace.points.length > MAX_TRACE_POINTS) trace.points.shift();
+            seg.push({ x: lm.x, y: lm.y });
+
+            // 總點數上限：從最舊的一段開始丟，整段空掉就把那一段移除
+            if (tracePointCount(trace) > MAX_TRACE_POINTS) {
+                const first = trace.segments[0];
+                first.shift();
+                if (!first.length) trace.segments.shift();
+            }
         }
 
         // 累積該手的移動量，供投擲手判定
@@ -1077,17 +1106,26 @@
         //
         // 注意座標系：正規化座標的 y 軸**向下增加**（畫面頂端是 0），
         // 所以「手腕高於手肘」寫成 wrist.y < elbow.y，不是大於。
-        const THROW_START_MARGIN = 0.02;   // 要高過手肘這個距離（正規化座標）才算，避免抖動誤觸
+        // 開始與停止用不同門檻（遲滯）。若兩者相同，手腕剛好停在手肘高度附近時
+        // 會在「累積／不累積」之間每幀反覆切換，軌跡被切成一堆碎片。
+        //   開始：要明確高過手肘 0.02 才起算
+        //   停止：一路到低於手肘高度（0）才停
+        const THROW_START_MARGIN = 0.02;
+        const THROW_STOP_MARGIN = 0;
 
-        // 一旦偵測到出手就維持成立，直到重播或換影片才重來
+        // 目前是否正在累積（手腕在手肘之上）
+        let accumulating = false;
+        // 是否曾經累積過，只用來決定狀態列要顯示「等待出手」還是「偵測中」
         let throwStarted = false;
 
-        function hasWristRisenAboveElbow(landmarks, hand) {
+        // 手腕高於手肘多少（正規化座標）。y 軸向下增加，所以是 elbow.y - wrist.y。
+        // 關鍵點看不到時回傳 null，代表無法判斷
+        function wristHeightAboveElbow(landmarks, hand) {
             const wrist = landmarks[WRIST_INDEX[hand]];
             const elbow = landmarks[ELBOW_INDEX[hand]];
-            if (!isVisible(wrist) || !isVisible(elbow)) return false;
+            if (!isVisible(wrist) || !isVisible(elbow)) return null;
 
-            return elbow.y - wrist.y > THROW_START_MARGIN;
+            return elbow.y - wrist.y;
         }
 
         function decideDominantHand() {
@@ -1117,23 +1155,37 @@
                 // 否則畫面上會從對側拉一條長線過來（頭部不依賴投擲手，所以不受影響）
                 dominantHand = hand;
                 statusHand.textContent = hand === "right" ? t("hand.right") : t("hand.left");
-                for (const key of HAND_DEPENDENT_TRACES) traces[key].points.length = 0;
+                for (const key of HAND_DEPENDENT_TRACES) clearTrace(traces[key]);
 
-                // 先前的出手判定是根據另一隻手做的，換手後必須重新等待出手，
-                // 否則會沿用錯誤的判定結果，準備動作又被畫進去
+                // 先前的判定是根據另一隻手做的，換手後一律重新開始
+                accumulating = false;
                 throwStarted = false;
             }
 
-            // 還在準備階段就不累積任何軌跡點。
-            // 注意這個 return 放在移動量累積與投擲手判定「之後」——
-            // 那兩件事必須全程進行，否則等到出手時還來不及判斷是哪隻手。
-            if (!throwStarted) {
-                if (!hasWristRisenAboveElbow(landmarks, hand)) {
-                    updateTraceStatus();
-                    return;
-                }
-                throwStarted = true;
+            // 只在「手腕高於手肘」期間累積軌跡，低於手肘就停止。
+            // 注意這段放在移動量累積與投擲手判定「之後」——
+            // 那兩件事必須全程進行，否則等到手舉起來時還來不及判斷是哪隻手。
+            const height = wristHeightAboveElbow(landmarks, hand);
+            if (height === null) {
+                // 手腕或手肘看不到，無法判斷。維持現狀不做切換，
+                // 但也不累積這一幀，免得把錯誤位置畫進去
+                updateTraceStatus();
+                return;
             }
+
+            accumulating = accumulating
+                ? height > THROW_STOP_MARGIN
+                : height > THROW_START_MARGIN;
+
+            if (!accumulating) {
+                // 手放下了：在每條軌跡留一個中斷，下次舉起時會另起一段，
+                // 不會從這裡拉一條直線過去
+                for (const key of Object.keys(traces)) breakTrace(traces[key]);
+                updateTraceStatus();
+                return;
+            }
+
+            throwStarted = true;
 
             // 手肘與肩膀都追蹤投擲手同側，方便和手臂動作直接對照
             if (traces.wrist.enabled) {
@@ -1154,14 +1206,17 @@
 
         // 移動幅度＝軌跡點涵蓋範圍的對角線長度（正規化座標），轉成畫面百分比
         function traceSpread(trace) {
-            const pts = trace.points;
-            if (pts.length < 2) return 0;
+            if (tracePointCount(trace) < 2) return 0;
             let minX = 1, maxX = 0, minY = 1, maxY = 0;
-            for (const p of pts) {
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
+            // 涵蓋範圍跨所有段一起算：中斷只是「這段時間沒在記錄」，
+            // 不代表要分開評估穩定度
+            for (const seg of trace.segments) {
+                for (const p of seg) {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
+                }
             }
             return Math.hypot(maxX - minX, maxY - minY);
         }
@@ -1184,7 +1239,7 @@
             // 明確區分「還沒出手所以沒有軌跡」與「已出手但點數還不夠」，
             // 否則使用者會以為是偵測壞掉
             if (!throwStarted) return t("trace.status.waiting");
-            if (trace.points.length < 2) return t("trace.status.detecting");
+            if (tracePointCount(trace) < 2) return t("trace.status.detecting");
             return labelFn(traceSpread(trace));
         }
 
@@ -1208,13 +1263,19 @@
         }
 
         function drawTraceLine(trace) {
-            const pts = trace.points;
-            if (pts.length < 2) return;
-
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
             ctx.strokeStyle = `rgba(${trace.color},0.9)`;
             ctx.lineWidth = 4;
+
+            // 每一段各自畫成獨立的一筆，段與段之間不連線
+            for (const seg of trace.segments) {
+                drawTraceSegment(seg);
+            }
+        }
+
+        function drawTraceSegment(pts) {
+            if (pts.length < 2) return;
 
             ctx.beginPath();
             ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
@@ -1781,7 +1842,7 @@
         window.onTraceCheckboxChange = function (key, checkboxEl) {
             const trace = traces[key];
             trace.enabled = checkboxEl.checked;
-            if (!trace.enabled) trace.points.length = 0;
+            if (!trace.enabled) clearTrace(trace);
             updateTraceStatus();
             updateTraceSummary();
         };
