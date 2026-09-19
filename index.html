@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.11　最後更新：2026-09-19 14:10
+  版本：v2.12　最後更新：2026-09-19 15:05
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -25,13 +25,11 @@
     <title>飛鏢投擲骨架分析器</title>
     <meta name="author" content="葉信男 YEH HSIN NAN" />
     <meta name="copyright" content="Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved." />
+    <!-- 共用基礎樣式（版面、配色、.copyright 等），
+         跟 privacy.html / sponsor.html 共用同一份。
+         必須放在下面的 <style> 之前，本頁才覆寫得掉共用設定。 -->
+    <link rel="stylesheet" href="site.css" />
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         /* 語言切換：固定在畫面右上角，不隨捲動位置改變 */
         /* 放在白色卡片「外面」正上方，跟卡片同寬、同樣置中，靠右對齊——
            跟著卡片走但不疊在卡片裡面，不管視窗多寬都跟卡片右邊緣切齊，
@@ -67,37 +65,22 @@
             color: #eff6ff;
         }
 
-        /* 整體背景：寧靜藍色系 */
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #e0f2fe 0%, #eef2ff 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 16px;
+        /* 本頁要放影片與控制項，卡片是三頁裡最寬的（共用預設值就是 960px，
+           這裡寫出來是為了讓人一眼看到本頁的寬度設定，不必去翻 site.css） */
+        :root {
+            --container-max: 960px;
         }
 
-        .container {
-            background: #f9fbff;
-            border-radius: 20px;
-            box-shadow: 0 8px 24px rgba(15,23,42,0.10);
-            padding: 20px 16px 18px;
-            max-width: 960px;
-            width: 100%;
-        }
-
+        /* 本頁內容密度高，桌機時的內距比另外兩頁收緊一點 */
         @media (min-width: 768px) {
             .container {
                 padding: 24px 28px 22px;
             }
         }
 
+        /* 標題下方緊接著控制按鈕，需要比另外兩頁更多的下方留白 */
         h1 {
-            color: #1d4ed8;
-            text-align: center;
             margin-bottom: 14px;
-            font-size: 24px;
             letter-spacing: 0.5px;
         }
 
@@ -391,12 +374,9 @@
             color: #1d4ed8;
         }
 
+        /* 上方已有頁尾連結，跟共用樣式相比可以少留一點上方間距 */
         .copyright {
             margin-top: 12px;
-            text-align: center;
-            font-size: 11px;
-            color: #94a3b8;
-            line-height: 1.6;
         }
 
         /* 版本與更新日期：顏色略深，方便一眼確認載入的是不是最新版 */
@@ -568,7 +548,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.11</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 14:10</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.12</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 15:05</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -681,6 +661,7 @@
             "recording.preparing": { zh: "準備中…", en: "Preparing…", ja: "準備中…", ko: "준비 중…" },
             "recording.active": { zh: "錄製中（{format}）", en: "Recording ({format})", ja: "録画中（{format}）", ko: "녹화 중 ({format})" },
             "trace.status.detecting": { zh: "偵測中…", en: "Detecting…", ja: "検出中…", ko: "감지 중…" },
+            "trace.status.waiting": { zh: "等待出手…", en: "Waiting for release…", ja: "リリース待ち…", ko: "릴리스 대기 중…" },
             "trace.status.stable": { zh: "穩定（{pct}）", en: "Stable ({pct})", ja: "安定（{pct}）", ko: "안정 ({pct})" },
             "trace.status.slight": { zh: "輕微晃動（{pct}）", en: "Slight movement ({pct})", ja: "若干の揺れ（{pct}）", ko: "약간 흔들림 ({pct})" },
             "trace.status.moving": { zh: "明顯移動（{pct}）", en: "Noticeable movement ({pct})", ja: "顕著な動き（{pct}）", ko: "뚜렷한 움직임 ({pct})" },
@@ -1035,6 +1016,7 @@
             handStates.left = createHandState();
             handStates.right = createHandState();
             dominantHand = null;
+            throwStarted = false;
             statusHand.textContent = t("hand.auto");
             updateTraceStatus();
         }
@@ -1069,6 +1051,43 @@
         // 軌跡就會一直被清空。所以一旦定了投擲手，要另一手明顯動得更多才改判。
         const DOMINANT_SWITCH_MARGIN = 1.25;
 
+        // === 出手偵測：軌跡從「手腕第一次超過手肘」那一刻才開始畫 ===
+        //
+        // 準備階段（舉鏢、瞄準、來回微調）手腕會在手肘後方小幅晃動，
+        // 那段路徑對動作分析沒有意義，畫出來只會讓畫面糊成一團。
+        // 投擲真正開始的特徵是前臂向前揮出——手腕越過手肘往鏢靶方向去。
+        //
+        // 「鏢靶方向」不能寫死成畫面的左或右：側面拍攝時人可能面向左，也可能面向右。
+        // 這裡用鼻子相對肩膀的水平位置判斷面向（投擲時選手面向鏢靶），
+        // 再看手腕有沒有越過手肘到那個方向。
+        const THROW_START_MARGIN = 0.02;   // 要超前手肘這個距離（正規化座標）才算，避免抖動誤觸
+        const MIN_FACING_OFFSET = 0.01;    // 鼻子與肩膀幾乎重疊時（正面拍攝）判斷不可靠
+
+        // 一旦偵測到出手就維持成立，直到重播或換影片才重來
+        let throwStarted = false;
+
+        // 回傳 +1 代表面向畫面右方、-1 代表左方，判斷不出來時回傳 0
+        function facingDirection(landmarks, hand) {
+            const nose = landmarks[NOSE_INDEX];
+            const shoulder = landmarks[SHOULDER_INDEX[hand]];
+            if (!isVisible(nose) || !isVisible(shoulder)) return 0;
+
+            const dx = nose.x - shoulder.x;
+            if (Math.abs(dx) < MIN_FACING_OFFSET) return 0;
+            return dx > 0 ? 1 : -1;
+        }
+
+        function hasWristPassedElbow(landmarks, hand) {
+            const wrist = landmarks[WRIST_INDEX[hand]];
+            const elbow = landmarks[ELBOW_INDEX[hand]];
+            if (!isVisible(wrist) || !isVisible(elbow)) return false;
+
+            const dir = facingDirection(landmarks, hand);
+            if (dir === 0) return false;
+
+            return (wrist.x - elbow.x) * dir > THROW_START_MARGIN;
+        }
+
         function decideDominantHand() {
             const right = handStates.right.moveAmount;
             const left = handStates.left.moveAmount;
@@ -1097,6 +1116,21 @@
                 dominantHand = hand;
                 statusHand.textContent = hand === "right" ? t("hand.right") : t("hand.left");
                 for (const key of HAND_DEPENDENT_TRACES) traces[key].points.length = 0;
+
+                // 先前的出手判定是根據另一隻手做的，換手後必須重新等待出手，
+                // 否則會沿用錯誤的判定結果，準備動作又被畫進去
+                throwStarted = false;
+            }
+
+            // 還在準備階段就不累積任何軌跡點。
+            // 注意這個 return 放在移動量累積與投擲手判定「之後」——
+            // 那兩件事必須全程進行，否則等到出手時還來不及判斷是哪隻手。
+            if (!throwStarted) {
+                if (!hasWristPassedElbow(landmarks, hand)) {
+                    updateTraceStatus();
+                    return;
+                }
+                throwStarted = true;
             }
 
             // 手肘與肩膀都追蹤投擲手同側，方便和手臂動作直接對照
@@ -1145,6 +1179,9 @@
 
         function traceStatusText(trace, labelFn) {
             if (!trace.enabled) return t("state.off");
+            // 明確區分「還沒出手所以沒有軌跡」與「已出手但點數還不夠」，
+            // 否則使用者會以為是偵測壞掉
+            if (!throwStarted) return t("trace.status.waiting");
             if (trace.points.length < 2) return t("trace.status.detecting");
             return labelFn(traceSpread(trace));
         }

@@ -15,5 +15,24 @@ desktop.ini
 # 個人技術筆記（含調校參數與踩坑記錄，不對外公開）
 NOTES.md
 
+# 機密資料：最後一道防線，不是第一道。
+#
+# 真正的機密（GitHub token、密碼、私鑰）正確的位置是作業系統的憑證管理機制，
+# 不是專案裡的檔案——本專案的 GitHub 認證就是交給 gh CLI 存在 Windows
+# 認證管理員，完全不落地。下面這些規則只是防止手滑把檔案加進來。
+#
+# 注意：analytics.js 裡的 GA4 評估 ID（G-開頭）不是機密，是公開識別碼，
+# 本來就該進 repo。詳見 CLAUDE.md「關於金鑰與機密」。
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.p12
+secrets.*
+*secret*
+*token*
+credentials.*
+
 # 飛鏢物體追蹤可行性測試（方案①顏色追蹤雛型），驗證通過再決定要不要正式納入
 dart-color-tracker-test.html
