@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.16　最後更新：2026-09-19 22:57
+  版本：v2.17　最後更新：2026-09-19 22:59
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -548,7 +548,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.16</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:57</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.17</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:59</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -1007,16 +1007,21 @@
         // 下一鏢換下一個顏色，疊在同一張畫面上就能看出每次出手的落差。
         // 部位靠所在位置區分（手腕畫得最遠、頭部在最上方），不靠顏色。
         //
-        // 選色原則：彼此色相差距大，且在影片畫面與純黑背景上都看得清楚。
+        // 選色原則：9 色的色相平均分布在色環上（每 40 度一個），彼此最容易分辨；
+        // 亮度則逐色微調，確保在純黑背景上的對比都在 6:1 以上——
+        // 黃綠區人眼最敏感所以壓低一點，藍紫區天生偏暗所以拉高，
+        // 否則純藍在黑底上會暗到看不清楚。
+        // 調整顏色時請一併確認色相間距與黑底對比，不要只憑肉眼挑。
         const THROW_COLORS = [
-            "255,60,60",     // 紅
-            "80,210,255",    // 青
-            "140,255,120",   // 綠
-            "255,215,70",    // 黃
-            "255,130,220",   // 粉
-            "170,140,255",   // 紫
-            "255,160,60",    // 橘
-            "120,255,230"    // 薄荷
+            "251,86,86",     // 紅    0°
+            "250,185,56",    // 橘   40°
+            "185,250,56",    // 黃   80°
+            "56,250,56",     // 綠  120°
+            "56,250,185",    // 翠  160°
+            "86,196,251",    // 青  200°
+            "126,126,252",   // 藍  240°
+            "210,126,252",   // 紫  280°
+            "251,86,196"     // 桃  320°
         ];
 
         // 目前是第幾鏢。每次手腕重新舉過手肘就 +1，決定該鏢的顏色。
