@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.17　最後更新：2026-09-19 22:59
+  版本：v2.18　最後更新：2026-09-19 23:04
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -374,6 +374,51 @@
             color: #1d4ed8;
         }
 
+        /* 鏢次圖例：每一鏢一個色塊，對照畫面上的軌跡顏色。
+           鏢數多時自動換行並靠右對齊，維持跟其他資訊列一樣的左標右值版面 */
+        .throw-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .throw-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 1px 7px 1px 4px;
+            border-radius: 999px;
+            background: #eef2ff;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        /* 目前這一鏢：加深底色與外框，一眼看出畫面上正在長的是哪一條 */
+        .throw-chip.current {
+            background: #dbeafe;
+            color: #1e3a8a;
+            box-shadow: 0 0 0 1.5px #60a5fa;
+        }
+
+        .throw-swatch {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            /* 淺色色塊（例如黃、翠）在白底上邊界會糊掉，補一圈淡灰描邊 */
+            box-shadow: 0 0 0 1px rgba(15,23,42,0.18);
+            flex: 0 0 auto;
+        }
+
+        /* 還沒有任何一鏢時顯示的提示字 */
+        .throw-legend-empty {
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
         /* 上方已有頁尾連結，跟共用樣式相比可以少留一點上方間距 */
         .copyright {
             margin-top: 12px;
@@ -529,6 +574,12 @@
                 <span class="info-label" data-i18n="info.hand">投擲手：</span>
                 <span class="info-value" id="statusHand">自動判斷中</span>
             </div>
+            <!-- 鏢次圖例：每一鏢一個色塊，對照畫面上的軌跡顏色。
+                 色塊由 JS 依 THROW_COLORS 產生，不在這裡寫死顏色。 -->
+            <div class="info-row">
+                <span class="info-label" data-i18n="info.throws">鏢次顏色：</span>
+                <span class="info-value throw-legend" id="throwLegend"></span>
+            </div>
             <div class="info-row">
                 <span class="info-label" data-i18n="info.model">骨架載入：</span>
                 <span class="info-value" id="statusModel">載入中…</span>
@@ -548,7 +599,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.17</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:59</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.18</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 23:04</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -592,6 +643,7 @@
         const statusWristTrace = document.getElementById("statusWristTrace");
         const statusElbowTrace = document.getElementById("statusElbowTrace");
         const statusHand = document.getElementById("statusHand");
+        const throwLegendEl = document.getElementById("throwLegend");
         const statusHeadTrace = document.getElementById("statusHeadTrace");
         const statusShoulderTrace = document.getElementById("statusShoulderTrace");
         const statusBlackBg = document.getElementById("statusBlackBg");
@@ -662,6 +714,9 @@
             "recording.active": { zh: "錄製中（{format}）", en: "Recording ({format})", ja: "録画中（{format}）", ko: "녹화 중 ({format})" },
             "trace.status.detecting": { zh: "偵測中…", en: "Detecting…", ja: "検出中…", ko: "감지 중…" },
             "trace.status.waiting": { zh: "等待出手…", en: "Waiting for release…", ja: "リリース待ち…", ko: "릴리스 대기 중…" },
+            "info.throws": { zh: "鏢次顏色：", en: "Throw colors:", ja: "投擲ごとの色：", ko: "투척별 색상：" },
+            "legend.empty": { zh: "尚無", en: "None yet", ja: "まだなし", ko: "아직 없음" },
+            "legend.throw": { zh: "第 {n} 鏢", en: "#{n}", ja: "{n} 投目", ko: "{n}번째" },
             "trace.status.stable": { zh: "穩定（{pct}）", en: "Stable ({pct})", ja: "安定（{pct}）", ko: "안정 ({pct})" },
             "trace.status.slight": { zh: "輕微晃動（{pct}）", en: "Slight movement ({pct})", ja: "若干の揺れ（{pct}）", ko: "약간 흔들림 ({pct})" },
             "trace.status.moving": { zh: "明顯移動（{pct}）", en: "Noticeable movement ({pct})", ja: "顕著な動き（{pct}）", ko: "뚜렷한 움직임 ({pct})" },
@@ -1285,7 +1340,54 @@
             return labelFn(traceSpread(trace));
         }
 
+        // 圖例只列出「畫面上真的還看得到」的鏢次。
+        // 軌跡有點數上限，最舊的段會被丟掉，那些鏢就不該繼續留在圖例裡。
+        // 四條軌跡的鏢次一致，但使用者可能只開其中幾條，所以取聯集。
+        function visibleThrowIndexes() {
+            const seen = new Set();
+            for (const key of Object.keys(traces)) {
+                const trace = traces[key];
+                if (!trace.enabled) continue;
+                for (const seg of trace.segments) {
+                    if (seg.points.length) seen.add(seg.throwIndex);
+                }
+            }
+            return [...seen].sort((a, b) => a - b);
+        }
+
+        function updateThrowLegend() {
+            const indexes = visibleThrowIndexes();
+            throwLegendEl.innerHTML = "";
+
+            if (!indexes.length) {
+                const empty = document.createElement("span");
+                empty.className = "throw-legend-empty";
+                empty.textContent = t("legend.empty");
+                throwLegendEl.appendChild(empty);
+                return;
+            }
+
+            for (const index of indexes) {
+                const chip = document.createElement("span");
+                chip.className = "throw-chip";
+                // 正在累積中的那一鏢才算「目前」；手放下之後就不再標示
+                if (accumulating && index === throwIndex) chip.classList.add("current");
+
+                const swatch = document.createElement("span");
+                swatch.className = "throw-swatch";
+                swatch.style.background = `rgb(${throwColor(index)})`;
+
+                const label = document.createElement("span");
+                label.textContent = t("legend.throw", { n: index });
+
+                chip.appendChild(swatch);
+                chip.appendChild(label);
+                throwLegendEl.appendChild(chip);
+            }
+        }
+
         function updateTraceStatus() {
+            updateThrowLegend();
             // 手腕本來就該大幅移動，只報範圍不做穩定度評價
             statusWristTrace.textContent = traceStatusText(
                 traces.wrist,
