@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.12　最後更新：2026-09-19 15:05
+  版本：v2.13　最後更新：2026-09-19 15:40
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -548,7 +548,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.12</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 15:05</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.13</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 15:40</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -1051,41 +1051,28 @@
         // 軌跡就會一直被清空。所以一旦定了投擲手，要另一手明顯動得更多才改判。
         const DOMINANT_SWITCH_MARGIN = 1.25;
 
-        // === 出手偵測：軌跡從「手腕第一次超過手肘」那一刻才開始畫 ===
+        // === 出手偵測：軌跡從「手腕第一次高過手肘」那一刻才開始畫 ===
         //
-        // 準備階段（舉鏢、瞄準、來回微調）手腕會在手肘後方小幅晃動，
+        // 準備階段（拿鏢、垂手、調整站位）手腕大多低於手肘且到處晃，
         // 那段路徑對動作分析沒有意義，畫出來只會讓畫面糊成一團。
-        // 投擲真正開始的特徵是前臂向前揮出——手腕越過手肘往鏢靶方向去。
+        // 把鏢舉起來、手腕升過手肘高度，才算真正進入投擲動作。
         //
-        // 「鏢靶方向」不能寫死成畫面的左或右：側面拍攝時人可能面向左，也可能面向右。
-        // 這裡用鼻子相對肩膀的水平位置判斷面向（投擲時選手面向鏢靶），
-        // 再看手腕有沒有越過手肘到那個方向。
-        const THROW_START_MARGIN = 0.02;   // 要超前手肘這個距離（正規化座標）才算，避免抖動誤觸
-        const MIN_FACING_OFFSET = 0.01;    // 鼻子與肩膀幾乎重疊時（正面拍攝）判斷不可靠
+        // 用高度（垂直）而不是前後（水平）判斷的好處是不必知道人面向哪一邊，
+        // 所以側面拍攝面向左或右都成立，正面拍攝也一樣能用。
+        //
+        // 注意座標系：正規化座標的 y 軸**向下增加**（畫面頂端是 0），
+        // 所以「手腕高於手肘」寫成 wrist.y < elbow.y，不是大於。
+        const THROW_START_MARGIN = 0.02;   // 要高過手肘這個距離（正規化座標）才算，避免抖動誤觸
 
         // 一旦偵測到出手就維持成立，直到重播或換影片才重來
         let throwStarted = false;
 
-        // 回傳 +1 代表面向畫面右方、-1 代表左方，判斷不出來時回傳 0
-        function facingDirection(landmarks, hand) {
-            const nose = landmarks[NOSE_INDEX];
-            const shoulder = landmarks[SHOULDER_INDEX[hand]];
-            if (!isVisible(nose) || !isVisible(shoulder)) return 0;
-
-            const dx = nose.x - shoulder.x;
-            if (Math.abs(dx) < MIN_FACING_OFFSET) return 0;
-            return dx > 0 ? 1 : -1;
-        }
-
-        function hasWristPassedElbow(landmarks, hand) {
+        function hasWristRisenAboveElbow(landmarks, hand) {
             const wrist = landmarks[WRIST_INDEX[hand]];
             const elbow = landmarks[ELBOW_INDEX[hand]];
             if (!isVisible(wrist) || !isVisible(elbow)) return false;
 
-            const dir = facingDirection(landmarks, hand);
-            if (dir === 0) return false;
-
-            return (wrist.x - elbow.x) * dir > THROW_START_MARGIN;
+            return elbow.y - wrist.y > THROW_START_MARGIN;
         }
 
         function decideDominantHand() {
@@ -1126,7 +1113,7 @@
             // 注意這個 return 放在移動量累積與投擲手判定「之後」——
             // 那兩件事必須全程進行，否則等到出手時還來不及判斷是哪隻手。
             if (!throwStarted) {
-                if (!hasWristPassedElbow(landmarks, hand)) {
+                if (!hasWristRisenAboveElbow(landmarks, hand)) {
                     updateTraceStatus();
                     return;
                 }
