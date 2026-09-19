@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.15　最後更新：2026-09-19 22:42
+  版本：v2.16　最後更新：2026-09-19 22:57
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -548,7 +548,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.15</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:42</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.16</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 22:57</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -1001,34 +1001,68 @@
             };
         }
 
-        // 軌跡以「段」為單位保存：手腕低於手肘時會中斷，再舉起就另起一段。
+        // === 軌跡配色：依「第幾鏢」上色，不是依部位 ===
+        //
+        // 目的是比較每一鏢之間的差異：同一鏢的手腕、手肘、頭部、肩膀共用一個顏色，
+        // 下一鏢換下一個顏色，疊在同一張畫面上就能看出每次出手的落差。
+        // 部位靠所在位置區分（手腕畫得最遠、頭部在最上方），不靠顏色。
+        //
+        // 選色原則：彼此色相差距大，且在影片畫面與純黑背景上都看得清楚。
+        const THROW_COLORS = [
+            "255,60,60",     // 紅
+            "80,210,255",    // 青
+            "140,255,120",   // 綠
+            "255,215,70",    // 黃
+            "255,130,220",   // 粉
+            "170,140,255",   // 紫
+            "255,160,60",    // 橘
+            "120,255,230"    // 薄荷
+        ];
+
+        // 目前是第幾鏢。每次手腕重新舉過手肘就 +1，決定該鏢的顏色。
+        // 顏色索引存在每一段裡（不是靠陣列位置算），所以即使舊的段因為
+        // 點數上限被丟掉，剩下的段顏色也不會跟著位移。
+        let throwIndex = 0;
+
+        // throwIndex 從 1 起算（第 1 鏢、第 2 鏢……，跟人的講法一致），
+        // 所以查表時要減 1，第 1 鏢才會拿到調色盤的第一個顏色
+        function throwColor(index) {
+            return THROW_COLORS[(index - 1) % THROW_COLORS.length];
+        }
+
+        // 軌跡以「段」為單位保存，一段就是一鏢。
         // 如果全部點擠在同一個陣列裡，中斷前後會被連成一條實際上不存在的直線
         // （從上一段結尾直接拉到新段起點），分段就是為了避免這件事。
-        function createTrace(color, enabled) {
-            return { segments: [], color, enabled };
+        function createTrace(enabled) {
+            return { segments: [], enabled };
         }
 
         function clearTrace(trace) {
             trace.segments.length = 0;
         }
 
-        // 手腕低於手肘時呼叫：讓下一個點另起一段
-        function breakTrace(trace) {
+        // 取得目前這一鏢的段；還不存在就建一個。
+        // 段自己記住是第幾鏢，顏色因此不會隨陣列位置改變。
+        function currentSegment(trace) {
             const last = trace.segments[trace.segments.length - 1];
-            if (last && last.length) trace.segments.push([]);
+            if (last && last.throwIndex === throwIndex) return last;
+
+            const seg = { throwIndex, points: [] };
+            trace.segments.push(seg);
+            return seg;
         }
 
         function tracePointCount(trace) {
             let n = 0;
-            for (const seg of trace.segments) n += seg.length;
+            for (const seg of trace.segments) n += seg.points.length;
             return n;
         }
 
         const traces = {
-            wrist: createTrace("255,60,60", true),     // 紅
-            elbow: createTrace("140,255,120", true),   // 綠
-            head: createTrace("255,215,70", true),     // 黃
-            shoulder: createTrace("80,210,255", true)  // 青
+            wrist: createTrace(true),
+            elbow: createTrace(true),
+            head: createTrace(true),
+            shoulder: createTrace(true)
         };
 
         function createHandState() {
@@ -1052,6 +1086,7 @@
             dominantHand = null;
             accumulating = false;
             throwStarted = false;
+            throwIndex = 0;
             statusHand.textContent = t("hand.auto");
             updateTraceStatus();
         }
@@ -1060,21 +1095,20 @@
             if (!lm) return;
             if (lm.visibility != null && lm.visibility < MIN_VISIBILITY_TRACE) return;
 
-            if (!trace.segments.length) trace.segments.push([]);
-            const seg = trace.segments[trace.segments.length - 1];
+            const seg = currentSegment(trace);
 
-            const last = seg[seg.length - 1];
+            const last = seg.points[seg.points.length - 1];
             if (last) {
                 const d = Math.hypot(lm.x - last.x, lm.y - last.y);
                 if (d < MIN_TRACE_SPACING) return;
             }
-            seg.push({ x: lm.x, y: lm.y });
+            seg.points.push({ x: lm.x, y: lm.y });
 
             // 總點數上限：從最舊的一段開始丟，整段空掉就把那一段移除
             if (tracePointCount(trace) > MAX_TRACE_POINTS) {
                 const first = trace.segments[0];
-                first.shift();
-                if (!first.length) trace.segments.shift();
+                first.points.shift();
+                if (!first.points.length) trace.segments.shift();
             }
         }
 
@@ -1173,17 +1207,20 @@
                 return;
             }
 
+            const wasAccumulating = accumulating;
             accumulating = accumulating
                 ? height > THROW_STOP_MARGIN
                 : height > THROW_START_MARGIN;
 
             if (!accumulating) {
-                // 手放下了：在每條軌跡留一個中斷，下次舉起時會另起一段，
-                // 不會從這裡拉一條直線過去
-                for (const key of Object.keys(traces)) breakTrace(traces[key]);
                 updateTraceStatus();
                 return;
             }
+
+            // 由「停」轉「累積」＝新的一鏢開始：換下一個顏色。
+            // 各條軌跡的段會在下次 pushTracePoint 時自己依這個編號建立，
+            // 所以四條線的鏢次與顏色天生對齊，不必額外同步。
+            if (!wasAccumulating) throwIndex++;
 
             throwStarted = true;
 
@@ -1211,7 +1248,7 @@
             // 涵蓋範圍跨所有段一起算：中斷只是「這段時間沒在記錄」，
             // 不代表要分開評估穩定度
             for (const seg of trace.segments) {
-                for (const p of seg) {
+                for (const p of seg.points) {
                     if (p.x < minX) minX = p.x;
                     if (p.x > maxX) maxX = p.x;
                     if (p.y < minY) minY = p.y;
@@ -1262,37 +1299,74 @@
             }
         }
 
+        // 出手瞬間手腕移動極快，一幀只能取到一個點，相鄰兩點在畫面上可能隔很遠，
+        // 直接連線看起來就是一條生硬的直線。這裡改用 Catmull-Rom 曲線插值：
+        // 曲線會通過每一個實際偵測點，中間依前後鄰點的走向補出圓滑的路徑。
+        //
+        // 必須誠實理解它的極限：插值只是讓「畫出來的線」順，
+        // 並沒有還原沒被拍到的動作。要真的看到更多細節，只能提高拍攝幀率。
+        // 而且一段只有兩個點時沒有鄰點可參考，畫出來仍然是直線。
+        const TRACE_SAMPLE_PX = 6;     // 每隔約幾個畫素補一個插值點
+        const TRACE_MAX_STEPS = 16;    // 單一區間的插值上限，避免極端點距拖慢繪製
+
+        function catmullRom(p0, p1, p2, p3, t) {
+            const t2 = t * t;
+            const t3 = t2 * t;
+            return {
+                x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t +
+                    (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                    (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+                y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t +
+                    (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                    (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+            };
+        }
+
         function drawTraceLine(trace) {
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
-            ctx.strokeStyle = `rgba(${trace.color},0.9)`;
             ctx.lineWidth = 4;
 
-            // 每一段各自畫成獨立的一筆，段與段之間不連線
+            // 每一段是一鏢，各自獨立一筆、各自的顏色，段與段之間不連線
             for (const seg of trace.segments) {
                 drawTraceSegment(seg);
             }
         }
 
-        function drawTraceSegment(pts) {
+        function drawTraceSegment(seg) {
+            const pts = seg.points;
             if (pts.length < 2) return;
 
+            ctx.strokeStyle = `rgba(${throwColor(seg.throwIndex)},0.9)`;
             ctx.beginPath();
             ctx.moveTo(pts[0].x * canvas.width, pts[0].y * canvas.height);
 
             if (pts.length === 2) {
                 ctx.lineTo(pts[1].x * canvas.width, pts[1].y * canvas.height);
-            } else {
-                // 以相鄰點中點為節點的二次貝茲曲線，讓折線變滑順
-                for (let i = 1; i < pts.length - 1; i++) {
-                    const curX = pts[i].x * canvas.width;
-                    const curY = pts[i].y * canvas.height;
-                    const midX = (curX + pts[i + 1].x * canvas.width) / 2;
-                    const midY = (curY + pts[i + 1].y * canvas.height) / 2;
-                    ctx.quadraticCurveTo(curX, curY, midX, midY);
+                ctx.stroke();
+                return;
+            }
+
+            for (let i = 0; i < pts.length - 1; i++) {
+                // 頭尾沒有鄰點時用自己代替，曲線端點才不會往外飛
+                const p0 = pts[i - 1] || pts[i];
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = pts[i + 2] || p2;
+
+                // 插值密度跟著點距走：手快、點距大就補得密，
+                // 手慢、點距小就少補幾點，不浪費繪製成本
+                const dx = (p2.x - p1.x) * canvas.width;
+                const dy = (p2.y - p1.y) * canvas.height;
+                const steps = Math.max(
+                    1,
+                    Math.min(TRACE_MAX_STEPS, Math.round(Math.hypot(dx, dy) / TRACE_SAMPLE_PX))
+                );
+
+                for (let s = 1; s <= steps; s++) {
+                    const q = catmullRom(p0, p1, p2, p3, s / steps);
+                    ctx.lineTo(q.x * canvas.width, q.y * canvas.height);
                 }
-                const last = pts[pts.length - 1];
-                ctx.lineTo(last.x * canvas.width, last.y * canvas.height);
             }
             ctx.stroke();
         }
