@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.9　最後更新：2026-09-17 15:10
+  版本：v2.10　最後更新：2026-09-19 13:30
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -430,6 +430,10 @@
     <!-- 共用版權資訊（姓名、當年年份），跟 privacy.html / sponsor.html 共用同一份 -->
     <script src="copyright.js"></script>
 
+    <!-- 共用流量統計（Cloudflare Web Analytics，無 Cookie）。
+         token 設定在 analytics.js 裡，三頁共用同一份；未填 token 時不會發出任何連線。 -->
+    <script src="analytics.js"></script>
+
     <!-- 按鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生。
          刻意放在 .container 外面、卡片正上方：跟卡片同寬、置中、靠右對齊，
          這樣語言鈕在白色卡片的外側，不會疊在卡片內容上面。 -->
@@ -563,7 +567,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.9</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-17 15:10</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.10</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 13:30</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>

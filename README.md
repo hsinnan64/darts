@@ -40,6 +40,9 @@
 - **姿態辨識**：[MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) — `pose_landmarker_full` 模型，GPU 加速
 - **繪製**：Canvas 2D
 - **錄製**：`canvas.captureStream()` + `MediaRecorder`
+- **流量統計**：[Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) — 無 Cookie、不做跨站追蹤，只統計整體瀏覽量
+
+統計的 beacon token 設定在 `analytics.js` 最上方的 `TOKEN`，三個頁面共用同一份。`TOKEN` 留空時腳本不會發出任何連線，因此本機開發不會污染統計數字。
 
 ### 關於追蹤穩定度
 

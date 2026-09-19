@@ -150,7 +150,7 @@
 <body>
     <div class="container">
         <h1>隱私權政策</h1>
-        <div class="updated">飛鏢投擲骨架分析器｜最後更新日期：2026 年 9 月 17 日</div>
+        <div class="updated">飛鏢投擲骨架分析器｜最後更新日期：2026 年 9 月 19 日</div>
 
         <div class="note">
             🌐 Non-Chinese speakers: please use your browser's built-in translation feature
@@ -186,8 +186,15 @@
         </ul>
 
         <p>
-            本服務本身<strong>不使用 Cookie</strong>，也不主動設置任何瀏覽器端追蹤技術。
-            唯一的例外來自姿態辨識所使用的 Google MediaPipe 程式庫本身內建的機制，詳見下方第三節。
+            本服務本身<strong>不使用 Cookie</strong>，也不使用 localStorage 等瀏覽器端的識別技術，
+            不會辨識您是誰、也不會記住您是否曾經造訪過。
+        </p>
+
+        <p>
+            本服務確實會統計<strong>整體的網頁瀏覽量</strong>（例如「這個頁面今天被看了幾次」），
+            以了解有多少人在使用。此統計採用<strong>無 Cookie</strong>的方式進行，
+            不會建立個人檔案、不會跨網站追蹤您，也<strong>與您的影片內容完全無關</strong>。
+            所使用的服務與其蒐集範圍，詳見下方第三節。
         </p>
 
         <h2>三、第三方服務</h2>
@@ -218,6 +225,11 @@
                 <td>提供本網頁內容</td>
                 <td>GitHub Pages / Cloudflare Pages</td>
             </tr>
+            <tr>
+                <td>Cloudflare Web Analytics</td>
+                <td>統計網頁瀏覽量（無 Cookie）</td>
+                <td>Cloudflare, Inc.</td>
+            </tr>
         </table>
 
         <p style="font-size: 13px; color: #64748b;">
@@ -227,6 +239,21 @@
         <p>
             這些第三方服務的資料處理方式，適用其各自的隱私權政策，不在本服務的控制範圍內。
         </p>
+
+        <div class="note">
+            <strong>關於網頁瀏覽量統計（Cloudflare Web Analytics）：</strong><br />
+            為了解本服務有多少人使用，本服務使用 Cloudflare Web Analytics 統計網頁瀏覽量。
+            它會記錄的項目包含：造訪的頁面網址、連結來源（referrer）、瀏覽器與作業系統類型、
+            裝置類型、來源國家，以及網頁載入效能等概略資訊。<br /><br />
+            <strong>這項統計不使用 Cookie、不使用 localStorage、不記錄完整 IP 位址，
+            也不會跨網站追蹤您或建立個人檔案</strong>，因此無法用來識別您個人的身分或使用習慣。<br /><br />
+            <strong>它同樣不包含您的影片內容、骨架座標或任何分析結果</strong>
+            ——這些資料完全在您的裝置本機處理，如同本政策第一節所述。<br /><br />
+            詳細說明請參閱 Cloudflare 官方文件：
+            <a href="https://developers.cloudflare.com/web-analytics/" target="_blank" rel="noopener noreferrer">Cloudflare Web Analytics 說明</a>
+            與
+            <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Cloudflare 隱私權政策</a>。
+        </div>
 
         <div class="note">
             <strong>關於 Google MediaPipe 的使用指標蒐集：</strong><br />
@@ -315,5 +342,8 @@
 
     <!-- 共用版權資訊（姓名、當年年份），跟 index.html / sponsor.html 共用同一份 -->
     <script src="copyright.js"></script>
+
+    <!-- 共用流量統計（Cloudflare Web Analytics，無 Cookie），詳見本頁第三節 -->
+    <script src="analytics.js"></script>
 </body>
 </html>
