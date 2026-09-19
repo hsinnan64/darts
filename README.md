@@ -40,9 +40,15 @@
 - **姿態辨識**：[MediaPipe Tasks Vision](https://github.com/google-ai-edge/mediapipe) — `pose_landmarker_full` 模型，GPU 加速
 - **繪製**：Canvas 2D
 - **錄製**：`canvas.captureStream()` + `MediaRecorder`
-- **流量統計**：[Cloudflare Web Analytics](https://developers.cloudflare.com/web-analytics/) — 無 Cookie、不做跨站追蹤，只統計整體瀏覽量
+- **流量統計**：Google Analytics 4 — 需使用者同意後才啟用
 
-統計的 beacon token 設定在 `analytics.js` 最上方的 `TOKEN`，三個頁面共用同一份。`TOKEN` 留空時腳本不會發出任何連線，因此本機開發不會污染統計數字。
+統計的評估 ID 設定在 `analytics.js` 最上方的 `MEASUREMENT_ID`（`G-` 開頭），三個頁面共用同一份。
+
+採取「預設不追蹤」：使用者按下同意橫幅的「同意」之前，完全不載入 GA、不發出任何對 Google 的連線、不寫入任何 Cookie。這比 Google Consent Mode 的預設拒絕更嚴格 — Consent Mode 在拒絕狀態下仍會送出無 Cookie 訊號，這裡是連 `gtag.js` 都不下載。選擇記在 `localStorage.darts_analytics_consent`。
+
+`MEASUREMENT_ID` 留空時橫幅不會出現、GA 也不會載入，等於整支停用，因此本機開發不會污染統計數字。
+
+同意橫幅的文案自帶 zh / en / ja / ko 四語翻譯表（`analytics.js` 的 `TEXT`）。index.html 的 `I18N` 在 module scope 內、外部腳本讀不到，所以不共用，但語言來源一致，都讀 `localStorage.darts_lang`；index.html 切換語言時會發出 `darts:langchange` 事件讓橫幅跟著重繪。
 
 ### 關於追蹤穩定度
 

@@ -2,7 +2,7 @@
 <!--
   飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
 
-  版本：v2.10　最後更新：2026-09-19 13:30
+  版本：v2.11　最後更新：2026-09-19 14:10
   ⚠️ 改版時，記得同步更新下面兩處：
      1. 這裡的版本與日期
      2. 頁尾 <footer class="copyright"> 裡的 #versionNumber 與 #lastUpdated 兩個 span
@@ -430,8 +430,9 @@
     <!-- 共用版權資訊（姓名、當年年份），跟 privacy.html / sponsor.html 共用同一份 -->
     <script src="copyright.js"></script>
 
-    <!-- 共用流量統計（Cloudflare Web Analytics，無 Cookie）。
-         token 設定在 analytics.js 裡，三頁共用同一份；未填 token 時不會發出任何連線。 -->
+    <!-- 共用流量統計（Google Analytics 4）＋ Cookie 同意橫幅。
+         評估 ID 設定在 analytics.js 裡，三頁共用同一份；
+         未填 ID、或使用者未按下同意之前，都不會載入 GA、不會寫入任何 Cookie。 -->
     <script src="analytics.js"></script>
 
     <!-- 按鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生。
@@ -567,7 +568,7 @@
 
         <footer class="copyright">
             <span class="version">
-                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.10</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 13:30</span>
+                <span data-i18n="footer.version">版本</span> <span id="versionNumber">v2.11</span>　<span data-i18n="footer.updated">最後更新</span> <span id="lastUpdated">2026-09-19 14:10</span>
             </span><br />
             <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
             <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
@@ -1819,6 +1820,11 @@
             applyStaticTranslations();
             renderDynamicUI();
             updateLangSwitchUI();
+
+            // 通知這個 module 外面的腳本一起換語言。目前的訂閱者是 analytics.js
+            // 的 Cookie 同意橫幅——它在 module scope 外，讀不到上面的 I18N，
+            // 所以自帶翻譯表，靠這個事件跟著切換。
+            document.dispatchEvent(new CustomEvent("darts:langchange", { detail: lang }));
         };
 
         // 初始化語言切換按鈕、套用記住的語言偏好，再載入 Pose 模型
