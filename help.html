@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<!--
+  使用說明 (Help)
+  版權所有 © 2026 葉信男 YEH HSIN NAN. 保留一切權利。
+  Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
+
+  2026-09-24：改成跟 index.html／camera.html 一樣的四語言 i18n（中/EN/日/韓）。
+  一開始做成單一中文版（比照 privacy.html／sponsor.html），使用者回報這頁
+  「少了多國語系」才補上——這頁是操作說明，非中文使用者一樣需要看得懂。
+  跟 privacy.html／sponsor.html 不同：那兩頁是法律文件，維持單一中文版的決定不變。
+-->
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>使用說明｜飛鏢投擲骨架分析</title>
+    <meta name="description" content="飛鏢投擲骨架分析的使用說明：基本操作、飛行軌跡功能怎麼用、拍攝建議與常見問題。免費網頁工具，影片全程在本機處理，不會上傳。" />
+    <link rel="canonical" href="https://hsinnan64.github.io/darts/help.html" />
+    <meta name="author" content="葉信男 YEH HSIN NAN" />
+    <meta name="copyright" content="Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="飛鏢投擲骨架分析" />
+    <meta property="og:title" content="使用說明｜飛鏢投擲骨架分析" />
+    <meta property="og:description" content="基本操作、飛行軌跡功能怎麼用、拍攝建議與常見問題。" />
+    <meta property="og:url" content="https://hsinnan64.github.io/darts/help.html" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="使用說明｜飛鏢投擲骨架分析" />
+    <meta name="twitter:description" content="基本操作、飛行軌跡功能怎麼用、拍攝建議與常見問題。" />
+    <!-- 給搜尋引擎與 AI 答案引擎（SEO/GEO/AEO）看的 FAQ 結構化資料。
+         ⚠️ 內容必須跟畫面上「常見問題」那四題逐字一致（Google 的規定），
+         改下面 <details> 的文字時這裡也要跟著改，不要讓兩邊分岔。
+         這裡固定放中文版——結構化資料只能對應一種語言，跟著頁面預設語言走。 -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "某一鏢顯示「沒抓到」是什麼意思？",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "代表那一鏢的飛鏢在畫面裡沒有清楚比對出來（通常是背景太雜或晃動太大），出手角度仍然算得出來，只是沒有畫面上的飛行曲線。"
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "影片會不會被上傳？",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "不會。所有分析與錄製都在你的手機或電腦本機完成，影片與結果不會傳到任何伺服器。"
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "出手角度準不準？",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "從飛鏢本身的飛行方向算出，只有側面拍攝時才代表真正的仰角；從背後或斜角拍攝時，算出來的是畫面上的角度，僅供同一支影片裡的每一鏢互相比較。"
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "電腦或手機比較舊，畫面看起來很亂？",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "骨架偵測需要一定的運算能力，太舊的系統或瀏覽器可能跟不上。頁面上方若出現黃色提示，照提示更新瀏覽器或把播放速度調成 0.5x／0.25x 再播一次。"
+                }
+            }
+        ]
+    }
+    </script>
+    <!-- 共用基礎樣式（版面、配色、.note/.highlight/.back-link 等），
+         跟 index.html / privacy.html / sponsor.html 共用同一份。
+         必須放在下面的 <style> 之前，本頁才覆寫得掉共用設定。 -->
+    <link rel="stylesheet" href="site.css" />
+    <style>
+        /* 本頁跟 privacy/sponsor 一樣不算寬 */
+        :root {
+            --container-max: 760px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        /* 這頁沒有頁籤（分析／錄影／說明三顆拿掉了——使用者：進來這頁不需要
+           重複的導覽列，回去按下面的「返回分析頁」或頁尾連結就好）。
+           頂列只剩語言鈕，靠右對齊，跟卡片同寬、同置中。 */
+        .top-bar {
+            display: flex;
+            justify-content: flex-end;
+            max-width: var(--container-max, 960px);
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0 auto 8px;
+            padding: 0 16px;
+        }
+
+        /* 語言切換鈕：跟 index.html 同一份樣式 */
+        .lang-switch {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 4px;
+        }
+        .lang-btn {
+            border: none;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.75);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 1px 4px rgba(15,23,42,0.12);
+            color: #475569;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .lang-btn.active {
+            background: #1d4ed8;
+            color: #eff6ff;
+        }
+
+        h2 {
+            color: #1e3a8a;
+            font-size: 16px;
+            margin: 26px 0 10px;
+        }
+        h2:first-of-type {
+            margin-top: 18px;
+        }
+
+        .steps {
+            list-style: none;
+            margin: 0 0 4px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .steps li {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            background: #fff;
+            border: 1px solid #dbe4ff;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin: 0;
+        }
+        .steps .num {
+            flex: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #1d4ed8;
+            color: #fff;
+            font-weight: 700;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 1px;
+        }
+        .steps b {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+        .steps span {
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.6;
+        }
+
+        /* 常見問題：原生 <details>，不用另外寫 JS */
+        .faq details {
+            background: #fff;
+            border: 1px solid #dbe4ff;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 8px 0;
+        }
+        .faq summary {
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #1e293b;
+        }
+        .faq p {
+            margin: 8px 0 0;
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.7;
+        }
+    </style>
+</head>
+<body>
+    <!-- 共用流量統計（Google Analytics 4）＋ Cookie 同意橫幅，跟其他頁一致 -->
+    <script src="analytics.js"></script>
+
+    <div class="top-bar">
+        <div class="lang-switch" id="langSwitch"></div>
+    </div>
+
+    <div class="container">
+        <h1 data-i18n="pageTitle">使用說明</h1>
+        <div class="updated" data-i18n="updated">飛鏢投擲骨架分析｜最後更新：2026 年 9 月 24 日</div>
+
+        <p data-i18n="intro">
+            網頁工具，免安裝。上傳影片或直接用手機錄，自動標出骨架、手腕軌跡、出手角度，
+            並算出每一鏢的飛行軌跡。影片全程在你的手機或電腦本機處理，不會上傳到任何伺服器。
+        </p>
+
+        <h2 data-i18n="h.basic">基本操作</h2>
+        <ol class="steps">
+            <li><span class="num">1</span><div><b data-i18n="basic1.title">開啟網頁</b><span data-i18n="basic1.body">手機或電腦瀏覽器直接打開即可，等骨架模型載入完成。</span></div></li>
+            <li><span class="num">2</span><div><b data-i18n="basic2.title">選影片，或切到「錄影」頁現場錄</b><span data-i18n="basic2.body">建議 H.264 編碼的 MP4；用手機錄的話，取景時螢幕會提示身體有沒有完整入鏡。</span></div></li>
+            <li><span class="num">3</span><div><b data-i18n="basic3.title">按「播放」</b><span data-i18n="basic3.body">開始標出骨架與手腕軌跡；預設純黑背景＋點狀軌跡，想看原始畫面可在「顯示設定」切換。</span></div></li>
+            <li><span class="num">4</span><div><b data-i18n="basic4.title">按「開始錄製」</b><span data-i18n="basic4.body">把含骨架與軌跡的畫面錄下來，錄完自動下載到裝置。</span></div></li>
+        </ol>
+
+        <h2 data-i18n="h.flight">飛行軌跡怎麼用</h2>
+        <ol class="steps">
+            <li><span class="num">1</span><div><b data-i18n="flight1.title">完整播放一次</b><span data-i18n="flight1.body">不用點任何按鈕。每一鏢出手後，程式會在背景自動算出那一鏢的飛行拋物線並畫出來，畫面左上角會顯示計算進度。</span></div></li>
+            <li><span class="num">2</span><div><b data-i18n="flight2.title">播完後按「重新播放」</b><span data-i18n="flight2.body">這時候每一鏢的飛行軌跡會跟著出手當下即時畫出來，不用再等待。</span></div></li>
+            <li><span class="num">3</span><div><b data-i18n="flight3.title">此時按「開始錄製」</b><span data-i18n="flight3.body">就能錄到含完整飛行軌跡的畫面，跟骨架、軌跡同步呈現。</span></div></li>
+        </ol>
+        <div class="highlight" data-i18n-html="highlight.body">
+            <strong>重點：</strong>第一次播放時軌跡是「邊播邊算」，錄影會錄到還沒算完的畫面；
+            <strong>先完整播放一次，再重新播放並錄製</strong>，才能錄到每一鏢即時畫出的完整飛行軌跡。
+        </div>
+
+        <h2 data-i18n="h.shoot">拍攝建議</h2>
+        <div class="note" data-i18n-html="shoot.body">
+            <strong>側面拍攝</strong>最穩：從背後或斜後方拍，骨架容易亂跳，追蹤明顯不穩。<br />
+            <strong>手機請固定</strong>（腳架或靠著東西），手持晃動會混進軌跡與身體位移的判讀。<br />
+            光線充足、背景越單純，骨架追蹤與飛行軌跡都算得越準。
+        </div>
+
+        <h2 data-i18n="h.faq">常見問題</h2>
+        <div class="faq">
+            <details>
+                <summary data-i18n="faq1.q">某一鏢顯示「沒抓到」是什麼意思？</summary>
+                <p data-i18n="faq1.a">代表那一鏢的飛鏢在畫面裡沒有清楚比對出來（通常是背景太雜或晃動太大），出手角度仍然算得出來，只是沒有畫面上的飛行曲線。</p>
+            </details>
+            <details>
+                <summary data-i18n="faq2.q">影片會不會被上傳？</summary>
+                <p data-i18n="faq2.a">不會。所有分析與錄製都在你的手機或電腦本機完成，影片與結果不會傳到任何伺服器。</p>
+            </details>
+            <details>
+                <summary data-i18n="faq3.q">出手角度準不準？</summary>
+                <p data-i18n="faq3.a">從飛鏢本身的飛行方向算出，只有側面拍攝時才代表真正的仰角；從背後或斜角拍攝時，算出來的是畫面上的角度，僅供同一支影片裡的每一鏢互相比較。</p>
+            </details>
+            <details>
+                <summary data-i18n="faq4.q">電腦或手機比較舊，畫面看起來很亂？</summary>
+                <p data-i18n="faq4.a">骨架偵測需要一定的運算能力，太舊的系統或瀏覽器可能跟不上。頁面上方若出現黃色提示，照提示更新瀏覽器或把播放速度調成 0.5x／0.25x 再播一次。</p>
+            </details>
+        </div>
+
+        <a class="back-link" href="index.html" data-i18n="backLink">← 返回分析頁</a>
+
+        <!-- 共用頁尾（連結列＋版本＋版權），footer.js 從 footer.html 抓進來，
+             五個頁面共用同一份，見 footer.html 開頭說明。 -->
+        <div id="siteFooter"></div>
+    </div>
+
+    <!-- 共用版權資訊（姓名、當年年份）與共用頁尾，五頁共用同一份 -->
+    <script src="copyright.js"></script>
+    <script src="footer.js"></script>
+
+    <script>!function(){const e="darts_lang",t={zh:"中",en:"EN",ja:"日",ko:"한"},o=Object.keys(t),n={zh:"zh-TW",ja:"ja",ko:"ko",en:"en"},a={appTitle:{zh:"飛鏢投擲骨架分析",en:"Darts Throwing Pose Analysis",ja:"ダーツ投擲フォーム解析",ko:"다트 투척 자세 분석"},pageTitle:{zh:"使用說明",en:"Help",ja:"使い方",ko:"도움말"},docTitle:{zh:"使用說明｜飛鏢投擲骨架分析",en:"Help | Darts Throwing Pose Analysis",ja:"使い方｜ダーツ投擲フォーム解析",ko:"도움말 | 다트 투척 자세 분석"},backLink:{zh:"← 返回分析頁",en:"← Back to Analysis",ja:"← 分析ページに戻る",ko:"← 분석 페이지로 돌아가기"},updated:{zh:"飛鏢投擲骨架分析｜最後更新：2026 年 9 月 24 日",en:"Darts Throwing Pose Analysis | Last updated: 2026-09-24",ja:"ダーツ投擲フォーム解析｜最終更新：2026年9月24日",ko:"다트 투척 자세 분석 | 마지막 업데이트: 2026-09-24"},intro:{zh:"網頁工具，免安裝。上傳影片或直接用手機錄，自動標出骨架、手腕軌跡、出手角度，並算出每一鏢的飛行軌跡。影片全程在你的手機或電腦本機處理，不會上傳到任何伺服器。",en:"A free web tool, no install needed. Upload a video or record with your phone — it automatically marks the skeleton, wrist trace and release angle, and works out each dart's flight path. Everything runs locally on your phone or computer; nothing is ever uploaded.",ja:"インストール不要のウェブツールです。動画をアップロードするか、スマホでその場で撮影すると、骨格・手首の軌跡・リリース角度を自動で表示し、各投擲の飛行軌跡も算出します。処理はすべてお使いの端末内で行われ、動画がサーバーに送信されることはありません。",ko:"설치가 필요 없는 웹 도구입니다. 동영상을 업로드하거나 휴대폰으로 바로 촬영하면 골격, 손목 궤적, 릴리스 각도를 자동으로 표시하고 각 다트의 비행 궤적도 계산합니다. 모든 처리는 사용자의 기기에서 로컬로 이루어지며 동영상이 서버로 업로드되는 일은 없습니다."},"h.basic":{zh:"基本操作",en:"Basic Steps",ja:"基本操作",ko:"기본 사용법"},"basic1.title":{zh:"開啟網頁",en:"Open the page",ja:"ページを開く",ko:"페이지 열기"},"basic1.body":{zh:"手機或電腦瀏覽器直接打開即可，等骨架模型載入完成。",en:"Open it directly in your phone or computer browser and wait for the pose model to finish loading.",ja:"スマホまたはパソコンのブラウザでそのまま開き、骨格モデルの読み込み完了を待ちます。",ko:"휴대폰이나 컴퓨터 브라우저에서 바로 열고 골격 모델 로딩이 끝날 때까지 기다리세요."},"basic2.title":{zh:"選影片，或切到「錄影」頁現場錄",en:"Choose a video, or switch to the Record tab",ja:"動画を選択するか「録画」タブでその場で撮影",ko:"동영상을 선택하거나 「녹화」 탭에서 바로 촬영"},"basic2.body":{zh:"建議 H.264 編碼的 MP4；用手機錄的話，取景時螢幕會提示身體有沒有完整入鏡。",en:"H.264-encoded MP4 is recommended. If recording with your phone, the framing screen will tell you whether your whole body is in view.",ja:"H.264 エンコードの MP4 を推奨します。スマホで撮影する場合、フレーミング画面で全身が収まっているか確認できます。",ko:"H.264 인코딩 MP4를 권장합니다. 휴대폰으로 촬영할 경우 프레이밍 화면에서 전신이 화면에 들어왔는지 알려줍니다."},"basic3.title":{zh:"按「播放」",en:"Press Play",ja:"「再生」を押す",ko:"「재생」 누르기"},"basic3.body":{zh:"開始標出骨架與手腕軌跡；預設純黑背景＋點狀軌跡，想看原始畫面可在「顯示設定」切換。",en:"Starts marking the skeleton and wrist trace. The default is a black background with dot traces — switch to the original video view in Display Settings.",ja:"骨格と手首の軌跡の描画が始まります。初期設定は黒背景＋点状の軌跡で、元の映像を見たい場合は「表示設定」で切り替えられます。",ko:"골격과 손목 궤적 표시가 시작됩니다. 기본값은 검은 배경 + 점 궤적이며, 원본 화면을 보려면 「표시 설정」에서 전환하세요."},"basic4.title":{zh:"按「開始錄製」",en:"Press Start Recording",ja:"「録画開始」を押す",ko:"「녹화 시작」 누르기"},"basic4.body":{zh:"把含骨架與軌跡的畫面錄下來，錄完自動下載到裝置。",en:"Records the screen with the skeleton and traces on it; the file downloads to your device automatically when done.",ja:"骨格と軌跡が表示された画面を録画し、終了すると自動的に端末にダウンロードされます。",ko:"골격과 궤적이 표시된 화면을 녹화하며, 완료되면 기기에 자동으로 다운로드됩니다."},"h.flight":{zh:"飛行軌跡怎麼用",en:"Using the Flight Path",ja:"飛行軌跡の使い方",ko:"비행 궤적 사용법"},"flight1.title":{zh:"完整播放一次",en:"Play through once",ja:"一度最後まで再生",ko:"한 번 끝까지 재생"},"flight1.body":{zh:"不用點任何按鈕。每一鏢出手後，程式會在背景自動算出那一鏢的飛行拋物線並畫出來，畫面左上角會顯示計算進度。",en:"No buttons needed. After each throw is released, the app automatically works out that dart's flight parabola in the background and draws it; progress shows in the top-left corner.",ja:"ボタン操作は不要です。各投擲のリリース後、バックグラウンドで自動的に飛行放物線を計算して描画します。進捗は画面左上に表示されます。",ko:"버튼을 누를 필요가 없습니다. 각 투척의 릴리스 후 백그라운드에서 자동으로 비행 포물선을 계산해 그립니다. 진행 상황은 화면 왼쪽 위에 표시됩니다."},"flight2.title":{zh:"播完後按「重新播放」",en:"Press Replay once it ends",ja:"終了後に「再生し直す」を押す",ko:"종료 후 「다시 재생」 누르기"},"flight2.body":{zh:"這時候每一鏢的飛行軌跡會跟著出手當下即時畫出來，不用再等待。",en:"This time, each dart's flight path is drawn live the moment it's released — no more waiting.",ja:"この時点で、各投擲の飛行軌跡はリリースの瞬間にリアルタイムで描画されます。もう待つ必要はありません。",ko:"이때는 각 다트의 비행 궤적이 릴리스되는 순간 실시간으로 그려집니다. 더 이상 기다릴 필요가 없습니다."},"flight3.title":{zh:"此時按「開始錄製」",en:"Press Start Recording now",ja:"このタイミングで「録画開始」を押す",ko:"이때 「녹화 시작」 누르기"},"flight3.body":{zh:"就能錄到含完整飛行軌跡的畫面，跟骨架、軌跡同步呈現。",en:"You'll capture the full flight path along with the skeleton and traces, all in sync.",ja:"骨格や軌跡と同期した、完全な飛行軌跡を含む映像を録画できます。",ko:"골격, 궤적과 함께 완전한 비행 궤적이 포함된 화면을 녹화할 수 있습니다."},"highlight.body":{zh:"<strong>重點：</strong>第一次播放時軌跡是「邊播邊算」，錄影會錄到還沒算完的畫面；<strong>先完整播放一次，再重新播放並錄製</strong>，才能錄到每一鏢即時畫出的完整飛行軌跡。",en:"<strong>Key point:</strong> on the first playback the flight path is calculated as it plays, so recording then captures unfinished paths. <strong>Play through once first, then replay and record</strong> to capture every dart's flight path drawn live.",ja:"<strong>重要：</strong>初回再生時は軌跡を計算しながら再生しているため、そのまま録画すると計算途中の映像になります。<strong>まず一度最後まで再生してから、再生し直して録画してください。</strong>これで各投擲の飛行軌跡がリアルタイムで描画された完全な映像を録画できます。",ko:"<strong>중요:</strong> 처음 재생할 때는 궤적을 계산하면서 재생하므로, 그대로 녹화하면 아직 계산되지 않은 화면이 찍힙니다. <strong>먼저 한 번 끝까지 재생한 후, 다시 재생하면서 녹화하세요.</strong> 그래야 각 다트의 비행 궤적이 실시간으로 그려지는 완전한 영상을 녹화할 수 있습니다."},"h.shoot":{zh:"拍攝建議",en:"Filming Tips",ja:"撮影のコツ",ko:"촬영 팁"},"shoot.body":{zh:"<strong>側面拍攝</strong>最穩：從背後或斜後方拍，骨架容易亂跳，追蹤明顯不穩。<br><strong>手機請固定</strong>（腳架或靠著東西），手持晃動會混進軌跡與身體位移的判讀。<br>光線充足、背景越單純，骨架追蹤與飛行軌跡都算得越準。",en:"<strong>Filming from the side</strong> is most stable — from behind or over the shoulder, the skeleton tends to jump around and tracking gets noticeably unstable.<br><strong>Mount the phone</strong> on a tripod or prop it against something — handheld shake gets mixed into the traces and body-drift readings.<br>Good lighting and a plain background make both skeleton tracking and the flight path more accurate.",ja:"<strong>横からの撮影</strong>が最も安定します。真後ろや斜め後ろから撮ると骨格が乱れやすく、追跡が明らかに不安定になります。<br><strong>スマホは固定してください</strong>（三脚や台に立てかける）。手持ちの揺れは軌跡や身体の移動量の判定に混ざってしまいます。<br>光量が十分で背景がシンプルなほど、骨格追跡と飛行軌跡の両方の精度が上がります。",ko:"<strong>측면 촬영</strong>이 가장 안정적입니다. 뒤쪽이나 대각선 뒤에서 찍으면 골격이 흔들리기 쉬워 추적이 눈에 띄게 불안정해집니다.<br><strong>휴대폰을 고정하세요</strong>(삼각대 또는 기대어 두기). 손으로 들면 흔들림이 궤적과 신체 이동량 판독에 섞여 들어갑니다.<br>조명이 충분하고 배경이 단순할수록 골격 추적과 비행 궤적 모두 더 정확하게 계산됩니다."},"h.faq":{zh:"常見問題",en:"FAQ",ja:"よくある質問",ko:"자주 묻는 질문"},"faq1.q":{zh:"某一鏢顯示「沒抓到」是什麼意思？",en:'What does "not found" mean for a throw?',ja:"ある投擲で「検出できず」と表示されるのはどういう意味ですか？",ko:"특정 투척에 「감지 못함」이라고 표시되는 건 무슨 뜻인가요?"},"faq1.a":{zh:"代表那一鏢的飛鏢在畫面裡沒有清楚比對出來（通常是背景太雜或晃動太大），出手角度仍然算得出來，只是沒有畫面上的飛行曲線。",en:"It means the dart couldn't be clearly matched in the frames for that throw (usually a busy background or too much camera shake). The release angle can still be calculated — there's just no flight curve drawn on screen.",ja:"その投擲ではダーツを画面上で明確に検出できなかったことを意味します（背景が複雑すぎる、または揺れが大きすぎるのが主な原因）。リリース角度は算出できますが、画面上に飛行曲線は表示されません。",ko:"해당 투척에서 다트를 화면에서 명확하게 찾지 못했다는 뜻입니다(대개 배경이 복잡하거나 흔들림이 심한 경우). 릴리스 각도는 계산되지만 화면에 비행 곡선은 표시되지 않습니다."},"faq2.q":{zh:"影片會不會被上傳？",en:"Is my video uploaded anywhere?",ja:"動画はアップロードされますか？",ko:"동영상이 업로드되나요?"},"faq2.a":{zh:"不會。所有分析與錄製都在你的手機或電腦本機完成，影片與結果不會傳到任何伺服器。",en:"No. All analysis and recording happen locally on your phone or computer — your video and results are never sent to any server.",ja:"いいえ。すべての解析と録画はお使いのスマホまたはパソコン内で完結し、動画や結果がサーバーに送信されることはありません。",ko:"아니요. 모든 분석과 녹화는 사용자의 휴대폰이나 컴퓨터에서 로컬로 이루어지며, 동영상과 결과는 어떤 서버로도 전송되지 않습니다."},"faq3.q":{zh:"出手角度準不準？",en:"How accurate is the release angle?",ja:"リリース角度の精度はどのくらいですか？",ko:"릴리스 각도는 얼마나 정확한가요?"},"faq3.a":{zh:"從飛鏢本身的飛行方向算出，只有側面拍攝時才代表真正的仰角；從背後或斜角拍攝時，算出來的是畫面上的角度，僅供同一支影片裡的每一鏢互相比較。",en:"It's calculated from the dart's own flight direction. It only reflects the true elevation angle when filmed from the side; from behind or at an angle, it's just the on-screen angle — useful for comparing throws within the same video, not as an absolute measurement.",ja:"ダーツ自体の飛行方向から算出しています。真横から撮影した場合のみ実際の仰角を反映し、後ろや斜めから撮影した場合は画面上の角度に過ぎず、同じ動画内での投擲同士の比較にのみ使えます。",ko:"다트 자체의 비행 방향으로 계산합니다. 옆에서 촬영했을 때만 실제 앙각을 반영하며, 뒤쪽이나 비스듬히 촬영한 경우 화면상의 각도일 뿐이므로 같은 동영상 내 투척끼리 비교하는 용도로만 사용하세요."},"faq4.q":{zh:"電腦或手機比較舊，畫面看起來很亂？",en:"My computer or phone is older and the screen looks jumpy?",ja:"パソコンやスマホが古く、画面が乱れて見えます",ko:"컴퓨터나 휴대폰이 오래되어 화면이 흔들려 보여요"},"faq4.a":{zh:"骨架偵測需要一定的運算能力，太舊的系統或瀏覽器可能跟不上。頁面上方若出現黃色提示，照提示更新瀏覽器或把播放速度調成 0.5x／0.25x 再播一次。",en:"Pose detection needs a fair amount of processing power — very old systems or browsers may not keep up. If a yellow notice appears at the top of the page, follow it to update your browser, or set playback speed to 0.5x/0.25x and play again.",ja:"骨格検出にはある程度の処理能力が必要で、古すぎるシステムやブラウザでは追いつかないことがあります。ページ上部に黄色い注意が表示された場合は、案内に従ってブラウザを更新するか、再生速度を 0.5x／0.25x に設定して再生し直してください。",ko:"골격 감지에는 어느 정도의 처리 능력이 필요하며, 너무 오래된 시스템이나 브라우저는 따라가지 못할 수 있습니다. 페이지 상단에 노란색 안내가 나타나면 안내에 따라 브라우저를 업데이트하거나 재생 속도를 0.5x/0.25x로 설정해 다시 재생하세요."}};let r=function(){try{const t=localStorage.getItem(e);return o.includes(t)?t:"zh"}catch(e){return"zh"}}();function s(e){const t=a[e];return t?t[r]||t.zh:(console.warn("i18n missing key:",e),e)}const i=document.getElementById("langSwitch");function h(t){if(o.includes(t)){r=t;try{localStorage.setItem(e,t)}catch(e){}document.documentElement.lang=n[t]||"en",document.title=s("docTitle"),document.querySelectorAll("[data-i18n]").forEach(e=>{e.textContent=s(e.getAttribute("data-i18n"))}),document.querySelectorAll("[data-i18n-html]").forEach(e=>{e.innerHTML=s(e.getAttribute("data-i18n-html"))}),i.querySelectorAll(".lang-btn").forEach(e=>{e.classList.toggle("active",e.dataset.lang===r)}),document.dispatchEvent(new CustomEvent("darts:langchange",{detail:t}))}}!function(){i.innerHTML="";for(const e of o){const o=document.createElement("button");o.className="lang-btn",o.type="button",o.dataset.lang=e,o.textContent=t[e]||e,o.onclick=()=>h(e),i.appendChild(o)}}(),h(r)}();</script>
+</body>
+</html>

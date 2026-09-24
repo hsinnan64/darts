@@ -1,0 +1,25 @@
+<!-- 五個頁面共用的頁尾片段（index.html / camera.html / help.html / privacy.html / sponsor.html）。
+     由 footer.js 用 fetch 抓進來，插到每一頁的 <div id="siteFooter"></div>，
+     插入後 footer.js 會自己翻譯成目前的語言（讀 localStorage.darts_lang）。
+
+     ⚠️ 這不是完整的 HTML 文件，不要加 <!DOCTYPE>/<html>/<head>/<body>，
+        直接就是要被塞進頁面的內容。
+
+     ⚠️ 四語言翻譯表在 footer.js 裡（不是這裡）——這裡只放結構與 data-i18n key，
+        文字內容改這裡沒用，要改 footer.js 的 FOOTER_I18N。
+
+     改版本號只改這裡一個地方：下面 #siteVersion／#siteUpdated 兩個 span，
+     五個頁面全部一起更新，不用再每個檔案分別改。 -->
+<nav class="site-links">
+    <a href="privacy.html" data-i18n="nav.privacy">隱私權政策</a>
+    <span class="link-sep">·</span>
+    <a href="sponsor.html" data-i18n="nav.sponsor">贊助支持</a>
+    <span class="link-sep">·</span>
+    <a href="help.html" data-i18n="nav.help">使用說明</a>
+</nav>
+
+<footer class="copyright">
+    <span class="version"><span data-i18n="footer.version">版本</span> <span id="siteVersion">v3.3</span>　<span data-i18n="footer.updated">最後更新</span> <span id="siteUpdated">2026-09-24</span></span><br />
+    <span data-i18n="footer.copyright">版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利</span><br />
+    <span data-i18n="footer.mediapipe">姿態辨識由 Google MediaPipe 提供（Apache License 2.0）</span>
+</footer>

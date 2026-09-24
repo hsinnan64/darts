@@ -1,0 +1,447 @@
+﻿<!DOCTYPE html>
+<!--
+  飛鏢投擲錄影頁 (Darts Recorder)
+
+  版本：v3　最後更新：2026-09-24
+  ⚠️ 2026-09-24 起版本號改成五個頁面共用一份，只改 footer.html 裡的
+     #siteVersion／#siteUpdated 兩個 span，不用再每個檔案分別改。
+     這裡的「版本：」只是給看原始碼／git log 的人對照，不是顯示用的。
+
+  這一頁**只負責錄影**，不做任何分析：
+  開相機 → 取景檢查 → 錄影 → 存進 IndexedDB → 跳到分析頁。
+
+  ⚠️ 為什麼用 IndexedDB 交棒：
+     錄出來的是 Blob，沒辦法用網址參數傳給另一頁；
+     sessionStorage 上限約 5MB，而 8Mbps 錄 30 秒就 30MB，塞不進去。
+     IndexedDB 可以直接存 Blob，同網域共用，GitHub Pages 上沒問題。
+     存失敗（無痕模式、配額不足）時會給下載連結當退路，不要讓使用者白錄一次。
+
+  相機與取景檢查的程式碼只存在這一頁（分析頁那一份已經在併回 index.html 時移除）。
+
+  版權所有 © 2026 葉信男 YEH HSIN NAN. 保留一切權利。
+  Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
+
+  未經著作權人書面授權，不得重製、散布、公開傳輸、改作或進行商業利用。
+  Unauthorized copying, distribution, modification, or commercial use is prohibited.
+
+  授權條款詳見同目錄下的 LICENSE 檔案。
+  See the LICENSE file for full terms.
+
+  本專案使用 Google MediaPipe Tasks Vision (Apache License 2.0)。
+-->
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>飛鏢投擲錄影</title>
+    <meta name="description" content="用手機相機直接錄下飛鏢投擲動作，錄完自動跳轉到分析頁做骨架與軌跡分析。免安裝、影片不會上傳。" />
+    <link rel="canonical" href="https://hsinnan64.github.io/darts/camera.html" />
+    <meta name="author" content="葉信男 YEH HSIN NAN" />
+    <meta name="copyright" content="Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="飛鏢投擲骨架分析" />
+    <meta property="og:title" content="飛鏢投擲錄影｜飛鏢投擲骨架分析" />
+    <meta property="og:description" content="用手機相機直接錄下飛鏢投擲動作，錄完自動跳轉到分析頁。" />
+    <meta property="og:url" content="https://hsinnan64.github.io/darts/camera.html" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta name="twitter:card" content="summary" />
+    <!-- 共用基礎樣式（版面、配色、.copyright 等），必須放在下面的 <style> 之前 -->
+    <link rel="stylesheet" href="site.css" />
+    <style>
+        /* 這一頁內容少，卡片不用像分析頁那麼寬 */
+        :root {
+            --container-max: 640px;
+        }
+
+        /* 語言切換：放在白色卡片「外面」正上方，跟卡片同寬、同樣置中、靠右對齊。
+           ⚠️ 寬度要吃 --container-max，不能像分析頁那樣寫死 960px ——
+              這一頁的卡片只有 640px，寫死就會突出卡片外緣對不齊。 */
+        .lang-switch {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 4px;
+            max-width: var(--container-max, 960px);
+            width: 100%;
+            margin: 0 auto 8px;
+            padding: 0 4px;
+        }
+
+        .lang-btn {
+            border: none;
+            border-radius: 999px;
+            /* 站在頁面漸層背景上，每顆按鈕自己要有底色才看得清楚 */
+            background: rgba(255,255,255,0.75);
+            backdrop-filter: blur(4px);
+            box-shadow: 0 1px 4px rgba(15,23,42,0.12);
+            color: #475569;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .lang-btn.active {
+            background: #1d4ed8;
+            color: #eff6ff;
+        }
+
+        h1 {
+            margin-bottom: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        .control-btn {
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            /* 手機 3 欄時欄寬只有 ~100px，字級略縮才容得下最長的「背景：影片」 */
+            font-size: 13px;
+            padding: 11px 6px;
+            text-align: center;
+            white-space: nowrap;
+            transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+            box-shadow: 0 1px 4px rgba(15,23,42,0.15);
+            min-height: 42px;
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        @media (min-width: 480px) {
+            .control-btn {
+                font-size: 14px;
+                padding: 10px 8px;
+                min-height: 38px;
+            }
+        }
+
+        .control-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .control-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(15,23,42,0.18);
+            opacity: 0.96;
+        }
+
+        .cam-panel {
+            background: #f0fdfa;
+            border: 1px solid #99f6e4;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin: 0 0 10px;
+        }
+
+        /* 三顆一排（開啟／關閉合併成一顆之後）。手機上也是一排，
+           省下的那一排高度直接讓相機畫面往上移。 */
+        .cam-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        @media (min-width: 560px) {
+            .cam-buttons { gap: 10px; }
+        }
+
+        /* 三欄時每欄只有約 115px，英文的 "Start Recording" 放不下。
+           這一排允許換行，不要沿用 .control-btn 的 nowrap。 */
+        .cam-buttons .control-btn {
+            white-space: normal;
+            line-height: 1.25;
+        }
+
+        .cam-open  { background: #14b8a6; color: #f0fdfa; }
+        /* 相機開著時這顆變成「關閉相機」—— 收斂成灰色，不要跟錄影鈕搶注意力 */
+        .cam-open.on { background: #e2e8f0; color: #475569; }
+        .cam-flip  { background: #ccfbf1; color: #115e59; }
+        .cam-rec   { background: #f87171; color: #fff; }
+        .cam-rec.on { background: #dc2626; }
+
+        /* 取景提示：跟規格說明分開兩行，才不會被 camSay() 的訊息蓋掉 */
+        .cam-check {
+            margin: 8px 0 0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+        .cam-check.warn {
+            background: #fffbeb;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+
+        /* 跟上面的預覽／取景提示拉開一點，不要黏在一起。
+           ⚠️ 要寫成 .seg-row.cam-fps-row —— 共用的 .seg-row（margin: 0 0 10px）
+              定義在這條後面，同權重時後面的勝出，只寫 .cam-fps-row 會被蓋掉。 */
+        .seg-row.cam-fps-row { margin: 18px 0 0; }
+        .cam-fps-row .seg-buttons { background: #ccfbf1; }
+        .cam-fps-row .seg-btn { color: #115e59; }
+        .cam-fps-row .seg-btn.active { background: #0d9488; color: #f0fdfa; }
+
+        .cam-stage {
+            position: relative;
+            width: 100%;
+            margin-top: 8px;
+            background: #0f172a;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        #camPreview { width: 100%; height: auto; display: block; }
+
+        /* 錄影中的紅點，讓使用者確定真的在錄 */
+        .cam-rec-dot {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239,68,68,0.35);
+            animation: camBlink 1s steps(2, start) infinite;
+        }
+        @keyframes camBlink { to { opacity: 0.25; } }
+
+        .cam-status {
+            margin-top: 8px;
+            font-size: 12px;
+            line-height: 1.7;
+            color: #115e59;
+        }
+        .cam-status.warn { color: #9a3412; font-weight: 600; }
+
+        .seg-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+        }
+
+        .seg-label {
+            color: #475569;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .seg-buttons {
+            display: flex;
+            gap: 4px;
+            /* 面板底色是 #f8fafc，分段按鈕要再深一階才分得出來 */
+            background: #e8edf7;
+            border-radius: 12px;
+            padding: 3px;
+        }
+
+        .seg-btn {
+            border: none;
+            border-radius: 9px;
+            background: transparent;
+            color: #1e3a8a;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 7px 14px;
+            cursor: pointer;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .seg-btn.active {
+            background: #1d4ed8;
+            color: #eff6ff;
+        }
+
+        .seg-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        /* 卡片外面的頂列：左邊是分析／錄影頁籤，右邊是語言鈕。
+           兩者跟卡片同寬、同樣置中，所以左右會各自跟卡片的左右緣切齊。
+           排在同一列而不是各佔一列，省下的高度直接讓卡片內容往上移。 */
+        .top-bar {
+            display: flex;
+            /* flex-end：頁籤要坐在卡片上緣，跟卡片連起來 */
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 8px;
+            max-width: var(--container-max, 960px);
+            width: 100%;
+            box-sizing: border-box;
+            /* ⚠️ 下方不留間距 —— 有間距就變成浮在上面，連接感會斷掉 */
+            margin: 0 auto;
+            /* 內縮避開卡片的 20px 圓角，頁籤才不會掉到圓弧外面 */
+            padding: 0 16px;
+        }
+
+        /* 這兩個原本各自負責置中與寬度，放進 .top-bar 之後改由它排版 */
+        .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px; padding: 0; }
+        .top-bar .page-tabs { margin: 0; }
+
+        /* 頁籤：分析 ↔ 錄影。Bootstrap 3 nav-tabs 那種「資料夾頁籤」的感覺 ——
+           選中的跟下方卡片連成一塊，未選中的是平的。
+           ⚠️ 沒有畫 Bootstrap 那條硬底線：卡片圓角 20px，直線在兩端會對不起來。
+              連接感改用「同底色 + 往上的陰影 + 貼著卡片上緣」做。 */
+        .page-tabs {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            width: fit-content;
+            margin: 0;
+        }
+
+        .page-tab {
+            /* 只有上面兩角是圓的，下緣是平的才接得住卡片 */
+            border-radius: 10px 10px 0 0;
+            padding: 8px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            background: transparent;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .page-tab:hover {
+            background: rgba(255, 255, 255, 0.55);
+            color: #1e3a8a;
+            text-decoration: none;
+        }
+
+        /* 目前這一頁的頁籤是 <span> 不是 <a> —— 點自己沒有意義，
+           也不該讓使用者按了整頁重載。
+           ⚠️ 底色要**跟卡片一模一樣**（#f9fbff），差一點就會看到接縫。
+              陰影只往上（0 -3px），往下打會在接縫處畫出一條線。 */
+        .page-tab.active {
+            background: #f9fbff;
+            color: #1d4ed8;
+            padding-bottom: 10px;
+            box-shadow: 0 -3px 10px rgba(15, 23, 42, 0.07);
+        }
+
+
+
+        .shoot-hint {
+            margin: 0 0 10px;
+            padding: 8px 12px;
+            background: #eff6ff;
+            border-left: 3px solid #60a5fa;
+            border-radius: 8px;
+            color: #1e40af;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        /* 錄影完成後，交棒失敗時的退路：直接給下載連結 */
+        .cam-fallback {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 10px;
+            color: #9a3412;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .cam-fallback a { color: #b45309; font-weight: 600; }
+
+        .err {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            color: #991b1b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- 卡片外面的頂列：左上角頁籤 + 右上角語言鈕。
+         刻意都放在 .container 外面 —— 在白色卡片的外側，不會疊在卡片內容上。
+         語言鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生。 -->
+    <div class="top-bar">
+        <!-- 頁籤：分析 ↔ 錄影。目前這一頁用 <span>，另一頁用 <a>。 -->
+        <nav class="page-tabs">
+            <a class="page-tab" href="index.html" data-i18n="nav.analyze">分析</a>
+            <span class="page-tab active" data-i18n="nav.record">錄影</span>
+        </nav>
+        <div class="lang-switch" id="langSwitch"></div>
+    </div>
+
+    <div class="container">
+        <h1 data-i18n="appTitle">飛鏢投擲錄影</h1>
+
+        <!-- 相機區：開相機取景 → 錄影 → 存進 IndexedDB → 跳到分析頁。
+             取景階段會用低頻率（每秒約 5 次）跑偵測，只為了回報「人有沒有完整在畫面裡」，
+             不畫骨架也不累積軌跡 —— 那些是分析頁的事。
+             取景檢查只給提示，不會關閉錄影鈕（理由見 JS 那一段的說明）。 -->
+        <div class="cam-panel">
+            <div class="cam-buttons">
+                <!-- ⚠️ 這顆是開啟／關閉的切換鈕，文字會變，所以不掛 data-i18n
+                     （會被 applyStaticTranslations 整批覆蓋），由 renderDynamicUI() 處理。 -->
+                <button class="control-btn cam-open" id="camOpenBtn">開啟相機</button>
+                <button class="control-btn cam-flip" id="camFlipBtn" disabled data-i18n="btn.camFlip">切換鏡頭</button>
+                <!-- ⚠️ 錄影鈕的文字會在開始／停止之間切換，所以不掛 data-i18n
+                     （會被 applyStaticTranslations 整批覆蓋掉），改由 renderDynamicUI() 處理。 -->
+                <button class="control-btn cam-rec"  id="camRecBtn"  disabled>開始錄影</button>
+            </div>
+            <div class="cam-stage" id="camStage">
+                <video id="camPreview" playsinline muted></video>
+                <div class="cam-rec-dot" id="camRecDot" hidden></div>
+            </div>
+            <p class="cam-check" id="camCheck" hidden></p>
+
+            <!-- ⚠️ 幀率列刻意放在預覽**下方**：上方每多一個區塊，
+                 相機畫面就被往下推一截，拍攝時要低頭找。
+                 按鈕是必須先按的所以留在上面，幀率是設定，放下面就好。 -->
+            <div class="seg-row cam-fps-row">
+                <span class="seg-label" data-i18n="label.fps">拍攝幀率</span>
+                <div class="seg-buttons" id="camFpsButtons"></div>
+            </div>
+
+            <!-- 這一行的內容由 renderCamStatus() 依目前訊息重畫，初始值是 cam.idle -->
+            <p class="cam-status" id="camStatus">相機未開啟。手機建議轉成<strong>橫向</strong>再開 —— 畫面比較寬，投擲手才容納得進去。<br />拍攝幀率選越高，慢放時越清楚 —— 但實際能給多少要看裝置，開啟後會顯示真正拿到的數字。</p>
+        </div>
+
+        <p class="err" id="errorMsg" style="display:none"></p>
+        <div id="fallbackBox" hidden></div>
+
+        <p class="shoot-hint" style="margin-top:14px" data-i18n="hint.sideView">
+            建議側面拍攝：從背後或斜後方拍，骨架容易亂跳，追蹤會明顯不穩。
+            手機請用腳架或靠著東西固定，手持的晃動會讓軌跡與身體位移分不出是人在動還是鏡頭在動。
+            本工具分析的是身體動作，不會偵測飛鏢本身的飛行軌跡。
+        </p>
+
+        <!-- 網頁錄影的畫質與幀率受瀏覽器限制（實測有裝置只給得到 30fps），
+             手機內建相機 App 一律比較好。這件事要講在前面，不要讓人錄完才發現。 -->
+        <p class="shoot-hint" data-i18n-html="hint.nativeCamera">
+            這一頁只負責錄影，按停止後會自動跳到分析頁。<br />
+            <strong>想要更好的畫質</strong>，建議改用手機內建的相機 App 錄
+            （畫質、幀率與防手震都比較好，也有慢動作模式），
+            再切到左上角的「分析」頁上傳 —— 網頁錄影的畫質與幀率受瀏覽器限制。
+        </p>
+
+        <!-- 共用頁尾（連結列＋版本＋版權），footer.js 從 footer.html 抓進來，
+             五個頁面共用同一份，見 footer.html 開頭說明。 -->
+        <div id="siteFooter"></div>
+    </div>
+
+    <!-- 共用流量統計（Google Analytics 4）＋ Cookie 同意橫幅，跟其他頁同一份設定。
+         未填評估 ID、或使用者未按下同意之前，都不會載入 GA、不會寫入任何 Cookie。 -->
+    <script src="analytics.js"></script>
+    <script src="copyright.js"></script>
+    <script src="footer.js"></script>
+    <script type="module">import{PoseLandmarker as e,FilesetResolver as n}from"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";const t="darts_lang",o={zh:"中",en:"EN",ja:"日",ko:"한"},r=Object.keys(o),a={appTitle:{zh:"飛鏢投擲錄影",en:"Darts Recorder",ja:"ダーツ撮影",ko:"다트 녹화"},"nav.analyze":{zh:"分析",en:"Analyze",ja:"分析",ko:"분석"},"nav.record":{zh:"錄影",en:"Record",ja:"録画",ko:"녹화"},"hint.nativeCamera":{zh:"這一頁只負責錄影，按停止後會自動跳到分析頁。<br /><strong>想要更好的畫質</strong>，建議改用手機內建的相機 App 錄（畫質、幀率與防手震都比較好，也有慢動作模式），再切到左上角的「分析」頁上傳 —— 網頁錄影的畫質與幀率受瀏覽器限制。",en:"This page only records; stopping jumps to the analysis page.<br /><strong>For better quality</strong>, record with your phone's built-in camera app instead (better quality, frame rate and stabilisation, plus slow motion), then upload it from the Analyze tab at the top left — in-browser recording is limited by the browser.",ja:"このページは録画専用で、停止すると分析ページへ移動します。<br /><strong>画質を重視するなら</strong>、スマートフォン内蔵のカメラアプリで撮影することをお勧めします（画質・フレームレート・手ブレ補正が優れ、スローモーションもあります）。撮影後は左上の「分析」タブからアップロードしてください —— ブラウザ録画は画質とフレームレートに制約があります。",ko:"이 페이지는 녹화만 담당하며, 정지하면 분석 페이지로 이동합니다.<br /><strong>화질을 중시한다면</strong> 휴대폰 기본 카메라 앱으로 촬영하세요 (화질·프레임 레이트·손떨림 보정이 더 좋고 슬로우 모션도 있습니다). 촬영 후 왼쪽 위의 「분석」 탭에서 업로드하면 됩니다 —— 브라우저 녹화는 화질과 프레임 레이트에 제약이 있습니다."},"hint.sideView":{zh:"建議側面拍攝：從背後或斜後方拍，骨架容易亂跳，追蹤會明顯不穩。手機請用腳架或靠著東西固定，手持的晃動會讓軌跡與身體位移分不出是人在動還是鏡頭在動。本工具分析的是身體動作，不會偵測飛鏢本身的飛行軌跡。",en:"Film from the side. Shooting from behind or over the shoulder makes the skeleton jump around — tracking gets noticeably unstable. Mount the phone on a tripod or prop it against something: handheld, the traces and body-drift readings can't tell your movement apart from the camera's. Note that this tool analyses body movement; it does not track the flight path of the dart itself.",ja:"側面からの撮影を推奨します。背後や斜め後ろから撮ると骨格が乱れ、追跡が明らかに不安定になります。スマートフォンは三脚や台に固定してください。手持ちだと画面の揺れと身体の動きが区別できず、軌跡や身体の移動量が正しく測れません。本ツールが分析するのは身体の動きで、ダーツ自体の飛行軌跡は検出しません。",ko:"측면 촬영을 권장합니다. 뒤나 비스듬한 뒤에서 찍으면 골격이 심하게 튀어 추적이 눈에 띄게 불안정해집니다. 휴대폰은 삼각대에 고정하거나 무언가에 기대어 두세요. 손으로 들면 화면 흔들림과 몸의 움직임을 구분할 수 없어 궤적과 신체 이동량이 정확하지 않습니다. 이 도구는 신체 동작을 분석하며, 다트 자체의 비행 궤적은 감지하지 않습니다."},"btn.camOpen":{zh:"開啟相機",en:"Open Camera",ja:"カメラを開く",ko:"카메라 열기"},"btn.camFlip":{zh:"切換鏡頭",en:"Flip Camera",ja:"カメラ切替",ko:"카메라 전환"},"btn.camRec":{zh:"開始錄影",en:"Start Recording",ja:"録画開始",ko:"녹화 시작"},"btn.camStop":{zh:"停止錄影",en:"Stop Recording",ja:"録画停止",ko:"녹화 중지"},"btn.camClose":{zh:"關閉相機",en:"Close Camera",ja:"カメラを閉じる",ko:"카메라 닫기"},"label.fps":{zh:"拍攝幀率",en:"Frame rate",ja:"フレームレート",ko:"프레임 레이트"},"cam.idle":{zh:"相機未開啟。手機建議轉成<strong>橫向</strong>再開 —— 畫面比較寬，投擲手才容納得進去。<br />拍攝幀率選越高，慢放時越清楚 —— 但實際能給多少要看裝置，開啟後會顯示真正拿到的數字。",en:"Camera is off. On a phone, turn it to <strong>landscape</strong> first — the wider frame fits your throwing arm.<br />A higher frame rate looks clearer in slow motion, but what you actually get depends on the device; the real number is shown once the camera opens.",ja:"カメラは未起動です。スマートフォンは<strong>横向き</strong>にしてから起動してください —— 画面が広く、投げる腕が収まります。<br />フレームレートが高いほどスロー再生が滑らかですが、実際に得られる値は端末次第です。起動後に実測値を表示します。",ko:"카메라가 꺼져 있습니다. 휴대폰은 <strong>가로</strong>로 돌린 뒤 여세요 —— 화면이 넓어야 던지는 팔이 들어갑니다.<br />프레임 레이트가 높을수록 슬로우 재생이 선명하지만 실제 값은 기기에 따라 다릅니다. 카메라를 열면 실제 수치를 표시합니다."},"cam.opened":{zh:"相機已開啟：{w}×{h}（{orient}尺寸）、{fps}。<br />擺好位置、對準側面，等上面的取景提示變成「取景 OK」再按「開始錄影」；按停止後會自動跳到分析頁。",en:"Camera on: {w}×{h} ({orient} frame), {fps}.<br />Get in position side-on, wait until the framing hint above says “Framing OK”, then press Start Recording. Stopping jumps to the analysis page.",ja:"カメラ起動：{w}×{h}（{orient}サイズ）、{fps}。<br />側面が写る位置に立ち、上の構図ヒントが「構図 OK」になってから「録画開始」を押してください。停止すると分析ページへ移動します。",ko:"카메라 켜짐: {w}×{h} ({orient} 크기), {fps}.<br />측면이 보이도록 자리를 잡고, 위의 구도 안내가 「구도 OK」가 되면 「녹화 시작」을 누르세요. 정지하면 분석 페이지로 이동합니다."},"orient.portrait":{zh:"直向",en:"portrait",ja:"縦向き",ko:"세로"},"orient.landscape":{zh:"橫向",en:"landscape",ja:"横向き",ko:"가로"},"fps.unknown":{zh:"幀率未提供（裝置沒回報）",en:"frame rate not reported by the device",ja:"フレームレート不明（端末が報告せず）",ko:"프레임 레이트 미제공 (기기가 보고하지 않음)"},"fps.got":{zh:"{got}fps",en:"{got}fps",ja:"{got}fps",ko:"{got}fps"},"fps.short":{zh:"<strong>實際只有 {got}fps</strong>（你要求 {want}，這台裝置給不到）",en:"<strong>only {got}fps</strong> (you asked for {want}; this device can't deliver it)",ja:"<strong>実測 {got}fps</strong>（{want} を要求しましたが、この端末では出せません）",ko:"<strong>실제 {got}fps</strong> (요청 {want}, 이 기기는 제공 불가)"},"chk.checking":{zh:"取景檢查中…",en:"Checking framing…",ja:"構図を確認中…",ko:"구도 확인 중…"},"chk.ok":{zh:"✓ 取景 OK：人完整在畫面裡，可以按「開始錄影」了。",en:"✓ Framing OK: the whole body is in frame. You can press Start Recording.",ja:"✓ 構図 OK：全身が画面に入っています。「録画開始」を押せます。",ko:"✓ 구도 OK: 전신이 화면에 들어왔습니다. 「녹화 시작」을 누르세요."},"chk.edge":{zh:"⚠ <strong>{parts}</strong>快超出畫面 —— 往後退一點，或把手機轉成橫向讓畫面變寬。",en:"⚠ <strong>{parts}</strong> about to leave the frame — step back, or turn the phone to landscape for a wider frame.",ja:"⚠ <strong>{parts}</strong>が画面から出そうです —— 少し下がるか、スマートフォンを横向きにして画面を広げてください。",ko:"⚠ <strong>{parts}</strong>이(가) 화면을 벗어나려 합니다 —— 뒤로 물러서거나 휴대폰을 가로로 돌려 화면을 넓히세요."},"chk.missing":{zh:"⚠ 看不到<strong>{parts}</strong> —— 讓整個身體進到畫面裡，側面拍攝效果最好。",en:"⚠ Can't see <strong>{parts}</strong> — get the whole body in frame; a side-on view works best.",ja:"⚠ <strong>{parts}</strong>が見えません —— 全身を画面に入れてください。側面からの撮影が最適です。",ko:"⚠ <strong>{parts}</strong>이(가) 보이지 않습니다 —— 전신이 화면에 들어오게 하세요. 측면 촬영이 가장 좋습니다."},"chk.noPerson":{zh:"⚠ 偵測不到人 —— 確認整個人在畫面裡、光線足夠，離鏡頭 2～3 公尺效果最好。<br />偵測不到也還是可以錄，這只是提示。",en:"⚠ No person detected — check that the whole body is in frame with enough light; 2–3 m from the camera works best.<br />You can still record either way; this is only a hint.",ja:"⚠ 人を検出できません —— 全身が画面に入り、十分な明るさがあるか確認してください。カメラから 2〜3m が最適です。<br />検出できなくても録画は可能です。これはヒントに過ぎません。",ko:"⚠ 사람을 감지하지 못했습니다 —— 전신이 화면에 들어오고 조명이 충분한지 확인하세요. 카메라에서 2~3m가 가장 좋습니다.<br />감지되지 않아도 녹화는 가능합니다. 이건 안내일 뿐입니다."},"chk.lying":{zh:"<br />（畫面裡的人是躺著的，這是瀏覽器錄影的常態；分析頁會自動轉正顯示，分析也不受影響，<strong>不用改拿法</strong>。）",en:"<br />(The person appears lying down — that's normal for browser recordings. The analysis page rotates it upright automatically and the analysis is unaffected, so <strong>don't change how you hold the phone</strong>.)",ja:"<br />（画面内の人が横になっています。これはブラウザ録画では通常のことです。分析ページで自動的に正しい向きに回転し、分析にも影響しません。<strong>持ち方を変える必要はありません</strong>。）",ko:"<br />(화면 속 사람이 누워 보입니다 —— 브라우저 녹화에서는 정상입니다. 분석 페이지가 자동으로 바로 세우며 분석에도 영향이 없으니 <strong>잡는 방법을 바꾸지 마세요</strong>.)"},"part.head":{zh:"頭部",en:"head",ja:"頭部",ko:"머리"},"part.shoulder":{zh:"肩膀",en:"shoulders",ja:"肩",ko:"어깨"},"part.hip":{zh:"髖部",en:"hips",ja:"腰",ko:"엉덩이"},"part.wrist":{zh:"手腕",en:"wrists",ja:"手首",ko:"손목"},"part.sep":{zh:"、",en:", ",ja:"・",ko:", "},"rec.active":{zh:"錄影中… 投完之後按「停止錄影」，會自動跳到分析頁。",en:"Recording… when you're done throwing, press Stop Recording and it jumps to the analysis page.",ja:"録画中… 投げ終わったら「録画停止」を押すと分析ページへ移動します。",ko:"녹화 중… 다 던진 뒤 「녹화 중지」를 누르면 분석 페이지로 이동합니다."},"rec.done":{zh:"錄影完成（{mb} MB），正在交給分析頁…",en:"Recording finished ({mb} MB), handing it to the analysis page…",ja:"録画完了（{mb} MB）。分析ページへ引き渡しています…",ko:"녹화 완료 ({mb} MB). 분석 페이지로 넘기는 중…"},"fallback.title":{zh:"影片沒有白錄 —— 先下載下來，再到分析頁上傳：",en:"The recording isn't lost — download it and upload it on the analysis page:",ja:"録画は無駄になりません —— ダウンロードして分析ページでアップロードしてください：",ko:"녹화는 사라지지 않았습니다 —— 내려받아 분석 페이지에서 업로드하세요:"},"fallback.download":{zh:"下載錄影（{mb} MB）",en:"Download recording ({mb} MB)",ja:"録画をダウンロード（{mb} MB）",ko:"녹화 내려받기 ({mb} MB)"},"error.insecure":{zh:"這個頁面不是安全連線（HTTPS），瀏覽器不會允許使用相機。請用 https:// 開啟。",en:"This page isn't served over HTTPS, so the browser won't allow camera access. Please open it via https://.",ja:"このページは安全な接続（HTTPS）ではないため、ブラウザがカメラの使用を許可しません。https:// で開いてください。",ko:"이 페이지는 보안 연결(HTTPS)이 아니어서 브라우저가 카메라 사용을 허용하지 않습니다. https:// 로 열어 주세요."},"error.noGetUserMedia":{zh:"這個瀏覽器不支援相機存取，請改用最新版 Chrome / Safari / Edge。",en:"This browser doesn't support camera access. Please use the latest Chrome, Safari or Edge.",ja:"このブラウザはカメラアクセスに対応していません。最新版の Chrome / Safari / Edge をご使用ください。",ko:"이 브라우저는 카메라 접근을 지원하지 않습니다. 최신 Chrome / Safari / Edge를 사용해 주세요."},"error.NotAllowedError":{zh:"你拒絕了相機權限，或瀏覽器設定擋掉了。請到網址列旁的權限設定開啟相機。",en:"Camera permission was denied, or the browser is blocking it. Open the permission settings next to the address bar and allow the camera.",ja:"カメラの権限が拒否されたか、ブラウザの設定でブロックされています。アドレスバー横の権限設定からカメラを許可してください。",ko:"카메라 권한이 거부되었거나 브라우저 설정이 차단하고 있습니다. 주소창 옆 권한 설정에서 카메라를 허용해 주세요."},"error.NotFoundError":{zh:"找不到可用的相機。",en:"No usable camera found.",ja:"使用可能なカメラが見つかりません。",ko:"사용 가능한 카메라를 찾을 수 없습니다."},"error.NotReadableError":{zh:"相機被其他程式佔用（例如另一個分頁或相機 App），請先關掉再試。",en:"The camera is in use by something else (another tab or a camera app). Close it and try again.",ja:"カメラが他のアプリ（別のタブやカメラアプリ）に使用されています。閉じてから再試行してください。",ko:"카메라를 다른 프로그램(다른 탭이나 카메라 앱)이 사용 중입니다. 닫은 뒤 다시 시도하세요."},"error.OverconstrainedError":{zh:"這台裝置的相機不支援要求的設定。",en:"This device's camera doesn't support the requested settings.",ja:"この端末のカメラは要求された設定に対応していません。",ko:"이 기기의 카메라는 요청한 설정을 지원하지 않습니다."},"error.camUnknown":{zh:"無法開啟相機",en:"Couldn't open the camera",ja:"カメラを開けません",ko:"카메라를 열 수 없습니다"},"error.camDetail":{zh:"{msg}（{name}：{detail}）",en:"{msg} ({name}: {detail})",ja:"{msg}（{name}：{detail}）",ko:"{msg} ({name}: {detail})"},"error.idbFail":{zh:"存進暫存區失敗（{name}）。無痕模式或儲存空間不足時會這樣。",en:"Couldn't save to temporary storage ({name}). This happens in private browsing or when storage is full.",ja:"一時保存に失敗しました（{name}）。プライベートモードや空き容量不足で発生します。",ko:"임시 저장에 실패했습니다 ({name}). 시크릿 모드이거나 저장 공간이 부족할 때 발생합니다."},"error.noRecorder":{zh:"這個瀏覽器無法錄影，請改用最新版 Chrome / Edge。",en:"This browser can't record video. Please use the latest Chrome or Edge.",ja:"このブラウザでは録画できません。最新版の Chrome か Edge をご使用ください。",ko:"이 브라우저는 녹화할 수 없습니다. 최신 Chrome 또는 Edge를 사용해 주세요."},"error.recInit":{zh:"錄影初始化失敗：{msg}",en:"Failed to start the recorder: {msg}",ja:"録画の初期化に失敗しました：{msg}",ko:"녹화 초기화에 실패했습니다: {msg}"},"error.recRuntime":{zh:"錄影過程發生錯誤：{name}",en:"An error occurred during recording: {name}",ja:"録画中にエラーが発生しました：{name}",ko:"녹화 중 오류가 발생했습니다: {name}"},"error.recNoData":{zh:"錄影結束但沒有取得任何影像資料。",en:"Recording finished but no video data was captured.",ja:"録画は終了しましたが、映像データを取得できませんでした。",ko:"녹화가 종료되었지만 영상 데이터를 가져오지 못했습니다."},"error.unknown":{zh:"未知",en:"unknown",ja:"不明",ko:"알 수 없음"}};let i=function(){try{const e=localStorage.getItem(t);return r.includes(e)?e:"zh"}catch(e){return"zh"}}();function s(e,n){const t=a[e];if(!t)return console.warn("i18n missing key:",e),e;let o=t[i]||t.zh;const r=window.SITE_COPYRIGHT?window.SITE_COPYRIGHT.year:(new Date).getFullYear(),c=Object.assign({year:r},n||{});for(const e in c){let n=c[e];n&&"object"==typeof n&&n.i18n&&(n=s(n.i18n,n.vars)),o=o.replace(`{${e}}`,n)}return o}const c=document.getElementById("langSwitch");window.setLanguage=function(e){if(r.includes(e)){i=e,p("lang_"+e);try{localStorage.setItem(t,e)}catch(e){}document.documentElement.lang={zh:"zh-TW",ja:"ja",ko:"ko",en:"en"}[e]||"en",document.title=s("appTitle"),document.querySelectorAll("[data-i18n]").forEach(e=>{e.textContent=s(e.getAttribute("data-i18n"))}),document.querySelectorAll("[data-i18n-html]").forEach(e=>{e.innerHTML=s(e.getAttribute("data-i18n-html"))}),F(),E.textContent=s(N?"btn.camStop":"btn.camRec"),K(),g(),w(),Q=!0,c.querySelectorAll(".lang-btn").forEach(e=>{e.classList.toggle("active",e.dataset.lang===i)})}};const l=document.getElementById("errorMsg");let d=null,m=null;function h(e,n){d=e,m=n||null,g()}function u(){d=null,g()}function g(){if(!d)return l.textContent="",void(l.style.display="none");l.innerHTML=s(d,m),l.style.display="block"}function p(e){const n=window.SITE_ANALYTICS;n&&"function"==typeof n.track&&n.track(e)}let f=null,k=!1;const b="recordings";let y=null;function w(){const e=document.getElementById("fallbackBox");if(!y)return e.hidden=!0,void(e.innerHTML="");const n=y,t=URL.createObjectURL(n),o=(n.type||"").indexOf("mp4")>=0?"mp4":"webm",r=(n.size/1048576).toFixed(1);e.hidden=!1,e.className="cam-fallback",e.innerHTML="";const a=document.createElement("p");a.style.margin="0 0 6px",a.textContent=s("fallback.title");const i=document.createElement("a");i.href=t,i.download="darts-"+Date.now()+"."+o,i.textContent=s("fallback.download",{mb:r}),e.appendChild(a),e.appendChild(i)}async function v(e){te(),U("rec.done",{mb:(e.size/1048576).toFixed(1)});try{await function(e){return new Promise(function(e,n){const t=indexedDB.open("darts-handoff",1);t.onupgradeneeded=function(){const e=t.result;e.objectStoreNames.contains(b)||e.createObjectStore(b)},t.onsuccess=function(){e(t.result)},t.onerror=function(){n(t.error)}}).then(function(n){return new Promise(function(t,o){const r=n.transaction(b,"readwrite");r.objectStore(b).put({blob:e,type:e.type,size:e.size,at:Date.now()},"pending"),r.oncomplete=function(){n.close(),t()},r.onerror=function(){n.close(),o(r.error)},r.onabort=function(){n.close(),o(r.error)}})})}(e)}catch(n){return h("error.idbFail",{name:n&&n.name?n.name:{i18n:"error.unknown"}}),void function(e){y=e,w()}(e)}O&&O.getTracks().forEach(function(e){e.stop()}),p("camera_handoff"),location.href="index.html?from=camera"}const j=document.getElementById("camOpenBtn"),z=document.getElementById("camFlipBtn"),E=document.getElementById("camRecBtn"),T=document.getElementById("camStage"),C=document.getElementById("camPreview"),S=document.getElementById("camCheck"),x=document.getElementById("camRecDot"),M=document.getElementById("camStatus"),B=(document.getElementById("rotInner"),[30,60,120]);let R=60,O=null,I="environment",L=null,P=[],N=!1;function F(){j.textContent=s(O?"btn.camClose":"btn.camOpen"),j.classList.toggle("on",!!O)}function H(){for(const e of document.getElementById("camFpsButtons").children)e.classList.toggle("active",Number(e.dataset.fps)===R)}async function _(e){B.includes(e)&&e!==R&&(R=e,H(),O&&(N&&ae(),O.getTracks().forEach(function(e){e.stop()}),O=null,j.disabled=!0,await G()))}let A="cam.idle",D=null,q=!1;function U(e,n,t){A=e,D=n||null,q=!!t,K()}function K(){M.innerHTML=s(A,D),M.classList.toggle("warn",q)}async function G(){if(u(),window.isSecureContext)if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia){try{O=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:I},width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:R}},audio:!1})}catch(e){return void h("error.camDetail",{msg:{i18n:["NotAllowedError","NotFoundError","NotReadableError","OverconstrainedError"].includes(e.name)?"error."+e.name:"error.camUnknown"},name:e.name,detail:e.message})}C.srcObject=O;try{await C.play()}catch(e){}T.style.display="block",z.disabled=!1,E.disabled=!1,te(),S.hidden=!1,S.className="cam-check",S.textContent=s("chk.checking"),J=setTimeout(re,Y),F(),function(){const e=O&&O.getVideoTracks()[0],n=e?e.getSettings():{},t=n.width||C.videoWidth||0,o=n.height||C.videoHeight||0,r=n.frameRate?Math.round(n.frameRate):null;let a;a=r?r>=R-5?{i18n:"fps.got",vars:{got:r}}:{i18n:"fps.short",vars:{got:r,want:R}}:{i18n:"fps.unknown"},U("cam.opened",{w:t,h:o,orient:{i18n:o>t?"orient.portrait":"orient.landscape"},fps:a},r&&r<R-5)}()}else h("error.noGetUserMedia");else h("error.insecure")}const Y=200,V=3,W=.04,$=[{key:"part.head",idx:[0],required:!1},{key:"part.shoulder",idx:[11,12],required:!0},{key:"part.hip",idx:[23,24],required:!0},{key:"part.wrist",idx:[15,16],required:!1}];let J=null,Q=!1,X=null,Z=null,ee=0,ne=-1;function te(){null!==J&&(clearTimeout(J),J=null),X=null,Z=null,ee=0,ne=-1,S.hidden=!0,S.innerHTML=""}function oe(){null!==J&&clearTimeout(J),J=setTimeout(re,Y)}function re(){if(J=null,!O||N)return;if(!f||!k)return void oe();const e=C.videoWidth,n=C.videoHeight;if(!e||!n||C.currentTime===ne)return void oe();ne=C.currentTime;let t=null;try{t=f.detectForVideo(C,performance.now())}catch(e){return void oe()}const o=t&&t.landmarks&&t.landmarks.length?function(e,n,t){const o=[],r=[];for(const n of $){let t=!1,a=!1;for(const o of n.idx){const n=e[o];n&&(null!=n.visibility&&n.visibility<.3||(t=!0,(n.x<W||n.x>1-W||n.y<W||n.y>1-W)&&(a=!0)))}t?a&&o.push(n.key):n.required&&r.push(n.key)}const a=function(e,n,t){const o=function(e,n,t){const o=e[11],r=e[12],a=e[23],i=e[24];if(!(o&&r&&a&&i))return null;for(const e of[o,r,a,i])if(null!=e.visibility&&e.visibility<.3)return null;const s=n||"undefined"!=typeof canvas&&canvas.width||1,c=t||"undefined"!=typeof canvas&&canvas.height||1,l=(o.x+r.x)/2*s,d=(o.y+r.y)/2*c,m=l-(a.x+i.x)/2*s,h=d-(a.y+i.y)/2*c,u=Math.hypot(m,h);return u?{ux:m/u,uy:h/u,torso:u,W:s,H:c}:null}(e,n,t);return o?180*Math.atan2(o.ux,-o.uy)/Math.PI:null}(e,n,t),i=null!==a&&Math.abs(a)>50,c=i?s("chk.lying"):"",l=e=>e.map(e=>s(e)).join(s("part.sep"));return o.length?{key:"edge:"+o.join(",")+"|"+i,warn:!0,html:s("chk.edge",{parts:l(o)})+c}:r.length?{key:"miss:"+r.join(",")+"|"+i,warn:!0,html:s("chk.missing",{parts:l(r)})+c}:{key:"ok|"+i,warn:!1,html:s("chk.ok")+c}}(t.landmarks[0],e,n):{key:"none",warn:!0,html:s("chk.noPerson")};Q?(Q=!1,X=o.key,Z=null,ee=0,S.className="cam-check"+(o.warn?" warn":""),S.innerHTML=o.html):o.key===X?(Z=null,ee=0):o.key===Z?++ee>=V&&(X=o.key,Z=null,ee=0,S.className="cam-check"+(o.warn?" warn":""),S.innerHTML=o.html):(Z=o.key,ee=1),oe()}function ae(){if(N&&L){try{L.stop()}catch(e){console.error(e)}N=!1,E.textContent=s("btn.camRec"),E.classList.remove("on"),x.hidden=!0}}!function(){const e=document.getElementById("camFpsButtons");e.innerHTML="";for(const n of B){const t=document.createElement("button");t.type="button",t.className="seg-btn",t.dataset.fps=String(n),t.textContent=n+"fps",t.addEventListener("click",()=>_(n)),e.appendChild(t)}H()}(),function(){c.innerHTML="";for(const e of r){const n=document.createElement("button");n.className="lang-btn",n.dataset.lang=e,n.textContent=o[e]||e,n.onclick=()=>window.setLanguage(e),c.appendChild(n)}}(),window.setLanguage(i),j.addEventListener("click",function(){O?(p("camera_close"),te(),N&&ae(),O&&O.getTracks().forEach(function(e){e.stop()}),O=null,C.srcObject=null,T.style.display="none",j.disabled=!1,z.disabled=!0,E.disabled=!0,F(),U("cam.idle"),u()):(p("camera_open"),G())}),z.addEventListener("click",function(){p("camera_flip"),async function(){I="environment"===I?"user":"environment",N&&ae(),O&&O.getTracks().forEach(function(e){e.stop()}),O=null,j.disabled=!0,await G()}()}),E.addEventListener("click",function(){N?(p("camera_rec_stop"),ae()):(p("camera_rec_start"),function(){if(!O)return;const e=["video/mp4;codecs=avc1.42E01E","video/mp4","video/webm;codecs=vp9","video/webm"].find(function(e){return MediaRecorder.isTypeSupported(e)})||"";if(e){try{L=new MediaRecorder(O,{mimeType:e,videoBitsPerSecond:8e6})}catch(e){return void h("error.recInit",{msg:e.message})}P=[],L.ondataavailable=function(e){e.data&&e.data.size&&P.push(e.data)},L.onerror=function(e){h("error.recRuntime",{name:e.error?e.error.name:{i18n:"error.unknown"}})},L.onstop=function(){P.length?v(new Blob(P,{type:L.mimeType||e})):h("error.recNoData")},te(),L.start(1e3),N=!0,E.textContent=s("btn.camStop"),E.classList.add("on"),x.hidden=!1,U("rec.active")}else h("error.noRecorder")}())}),window.addEventListener("pagehide",function(){O&&O.getTracks().forEach(function(e){e.stop()})}),async function(){try{const t=await n.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");f=await e.createFromOptions(t,{baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",delegate:"GPU"},runningMode:"VIDEO",numPoses:1,minPoseDetectionConfidence:.6,minPosePresenceConfidence:.6,minTrackingConfidence:.6}),k=!0}catch(e){console.error(e)}}();</script>
+</body>
+</html>

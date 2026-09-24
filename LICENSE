@@ -1,0 +1,99 @@
+版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利
+Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
+
+飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
+
+
+================================================================
+專有軟體授權條款 / PROPRIETARY SOFTWARE LICENSE
+================================================================
+
+【繁體中文】
+
+本軟體及其原始碼、設計、演算法與相關文件（以下合稱「本軟體」）之著作權
+均為著作權人 葉信男 YEH HSIN NAN 所有，並受中華民國著作權法及國際著作權條約保護。
+
+一、授權範圍
+    著作權人僅授權一般使用者，得於本軟體之官方網站以瀏覽器線上使用本軟體
+    所提供之功能，供個人非商業目的之用。
+
+二、禁止事項
+    未經著作權人事前書面同意，任何人不得為下列行為：
+    1. 重製、下載、儲存、散布、公開傳輸或公開展示本軟體之原始碼或任何部分。
+    2. 修改、改作、翻譯、反向工程、反組譯或建立衍生著作。
+    3. 將本軟體之全部或部分，用於任何商業用途、營利行為或併入其他產品或服務。
+    4. 移除、變更或遮蔽本軟體中之著作權宣告、授權聲明或其他權利標示。
+    5. 轉授權、出租、出借、販售本軟體或以其他方式提供第三人使用。
+
+三、無擔保聲明
+    本軟體係以「現狀」提供，著作權人不為任何明示或默示之擔保，包括但不限於
+    適售性、特定目的之適用性及未侵害他人權利之擔保。使用者應自行承擔使用
+    本軟體之全部風險。
+
+四、責任限制
+    於法律允許之最大範圍內，著作權人對於因使用或無法使用本軟體所生之任何
+    直接、間接、附帶、特殊、懲罰性或衍生性損害，均不負賠償責任。
+
+五、其他授權洽詢
+    如需取得商業授權、合作或其他使用授權，請與著作權人聯繫。
+
+
+【English】
+
+All rights in and to this software, including its source code, design,
+algorithms, and related documentation (collectively, the "Software"),
+are owned by 葉信男 YEH HSIN NAN (the "Copyright Holder") and are protected by
+copyright laws and international copyright treaties.
+
+1. GRANT OF LICENSE
+   The Copyright Holder grants end users a limited, non-exclusive,
+   non-transferable right to use the functionality of the Software via a
+   web browser on its official website, for personal, non-commercial
+   purposes only.
+
+2. RESTRICTIONS
+   Without the prior written consent of the Copyright Holder, no person may:
+   a. Copy, download, store, distribute, publicly transmit, or publicly
+      display the source code of the Software or any portion thereof.
+   b. Modify, adapt, translate, reverse engineer, decompile, disassemble,
+      or create derivative works based on the Software.
+   c. Use the Software, in whole or in part, for any commercial purpose,
+      or incorporate it into any other product or service.
+   d. Remove, alter, or obscure any copyright, license, or other
+      proprietary notice contained in the Software.
+   e. Sublicense, rent, lease, sell, or otherwise make the Software
+      available to any third party.
+
+3. DISCLAIMER OF WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+4. LIMITATION OF LIABILITY
+   TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+   PUNITIVE, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH
+   THE USE OF OR INABILITY TO USE THE SOFTWARE.
+
+5. COMMERCIAL LICENSING
+   For commercial licensing, partnership, or other usage permissions,
+   please contact the Copyright Holder.
+
+
+================================================================
+第三方元件 / THIRD-PARTY COMPONENTS
+================================================================
+
+本軟體使用下列第三方元件，各自依其原授權條款釋出，不受上述專有授權條款拘束：
+The Software uses the following third-party components, each licensed under
+its own terms and not subject to the proprietary license above:
+
+1. Google MediaPipe Tasks Vision
+   Copyright 2023 The MediaPipe Authors
+   Licensed under the Apache License, Version 2.0
+   https://www.apache.org/licenses/LICENSE-2.0
+   https://github.com/google-ai-edge/mediapipe
+
+2. MediaPipe Pose Landmarker Model (pose_landmarker_full)
+   Copyright 2023 The MediaPipe Authors
+   Licensed under the Apache License, Version 2.0

@@ -1,0 +1,192 @@
+/* 三個頁面共用的基礎樣式。
+ * index.html / privacy.html / sponsor.html 都用
+ * <link rel="stylesheet" href="site.css" /> 引用這支檔案。
+ *
+ * 分工原則：
+ *   這裡只放「至少兩個頁面長得一樣」的東西——版面骨架、配色、
+ *   共用的區塊樣式（.note / .highlight / .back-link / .copyright）。
+ *   只有單一頁面用得到的樣式（例如 index 的控制按鈕、privacy 的表格、
+ *   sponsor 的感謝名單）仍留在各自頁面的 <style> 裡，不要搬進來。
+ *
+ * 覆寫方式：
+ *   各頁面的 <style> 必須放在這支 CSS 的 <link> 之後。
+ *   同權重時後面的規則勝出，所以頁面要微調時直接在自己的 <style> 覆寫即可，
+ *   不需要加 !important。
+ *
+ * 版權所有 © 葉信男 YEH HSIN NAN. 保留一切權利。
+ */
+
+:root {
+    /* 卡片寬度是三頁唯一的實質差異：
+     * index 要放影片與控制項所以最寬，sponsor 內容最少所以最窄。
+     * 各頁在自己的 <style> 裡覆寫這個變數即可，不必重寫整條 .container */
+    --container-max: 960px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 整體背景：寧靜藍色系 */
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #e0f2fe 0%, #eef2ff 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+}
+
+.container {
+    background: #f9fbff;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(15,23,42,0.10);
+    padding: 20px 16px 18px;
+    max-width: var(--container-max);
+    width: 100%;
+}
+
+@media (min-width: 768px) {
+    .container {
+        padding: 28px 32px 24px;
+    }
+}
+
+h1 {
+    color: #1d4ed8;
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+
+h2 {
+    color: #1e3a8a;
+    font-size: 17px;
+    margin: 22px 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #dbeafe;
+}
+
+p, li {
+    color: #334155;
+    font-size: 14px;
+    line-height: 1.85;
+}
+
+ul {
+    padding-left: 22px;
+    margin: 6px 0;
+}
+
+li {
+    margin-bottom: 4px;
+}
+
+/* 標題底下的小字說明（privacy 的更新日期、sponsor 的副標） */
+.subtitle,
+.updated {
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 20px;
+}
+
+/* 綠色：正面、令人安心的訊息（影片不上傳、本工具永遠免費）。
+ * .free-notice 是 sponsor.html 的既有名稱，語意比 .highlight 清楚，
+ * 樣式完全相同所以併在同一條規則，不強迫改寫既有 HTML。 */
+.highlight,
+.free-notice {
+    background: #ecfdf5;
+    border-left: 4px solid #34d399;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin: 12px 0;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #065f46;
+}
+
+/* 黃色：需要留意、但不是警告的補充說明 */
+.note {
+    background: #fffbeb;
+    border-left: 4px solid #fbbf24;
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin: 12px 0;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #78350f;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 24px;
+    padding: 9px 18px;
+    background: #60a5fa;
+    color: #eff6ff;
+    border-radius: 999px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: opacity 0.15s;
+}
+
+.back-link:hover {
+    opacity: 0.88;
+}
+
+.copyright {
+    /* 上方一律有 .site-links（共用頁尾片段固定帶著），比沒有連結列時緊一點 */
+    margin-top: 12px;
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.6;
+}
+
+/* 頁尾連結列＋版本列：原本 index.html／camera.html 各自維護一份一字不差的複本，
+ * 2026-09-24 起五個頁面共用同一份 footer.html（見該檔案開頭說明），移到這裡統一維護。
+ * ⚠️ 用 flex + justify-content:center + gap 置中，不要用 text-align:center。
+ *    原本是 text-align:center 配 .link-sep 手動 margin，字級變大或視窗變窄
+ *    導致換行時，手動 margin 在換行點兩側不對稱，看起來像沒置中——
+ *    flex 置中每一行自己算置中，不會有這個問題，分隔點也不用再各自留 margin。 */
+.site-links {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.site-links a {
+    color: #3b82f6;
+    text-decoration: none;
+}
+
+.site-links a:hover {
+    text-decoration: underline;
+}
+
+.link-sep {
+    color: #cbd5e1;
+}
+
+.version {
+    color: #64748b;
+    font-weight: 600;
+}
+
+/* Cookie 名稱、GA 參數名等識別字 */
+code {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.92em;
+    background: #eef2ff;
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: #3730a3;
+    word-break: break-all;
+}
