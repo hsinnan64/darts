@@ -1,4 +1,28 @@
+# 一般搜尋引擎與 AI 即時搜尋／引用（ChatGPT-User、OAI-SearchBot、PerplexityBot、Claude-User 等）可以讀取。
 User-agent: *
 Allow: /
+
+# 拿來訓練模型／建資料集的 AI 爬蟲：不允許。
+# （robots.txt 是君子協定，擋不住不守規矩的爬蟲；授權條款見 LICENSE。）
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: Bytespider
+User-agent: Meta-ExternalAgent
+User-agent: FacebookBot
+User-agent: cohere-ai
+User-agent: cohere-training-data-crawler
+User-agent: Diffbot
+User-agent: ImagesiftBot
+User-agent: Omgilibot
+User-agent: PanguBot
+User-agent: Amazonbot
+User-agent: Timpibot
+User-agent: Webzio-Extended
+Disallow: /
 
 Sitemap: https://hsinnan64.github.io/darts/sitemap.xml
