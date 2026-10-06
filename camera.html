@@ -21,15 +21,11 @@
     <meta name="twitter:card" content="summary" />
         <link rel="stylesheet" href="site.css" />
     <style>
-        /* 這一頁內容少，卡片不用像分析頁那麼寬 */
-        :root {
+                :root {
             --container-max: 640px;
         }
 
-        /* 語言切換：放在白色卡片「外面」正上方，跟卡片同寬、同樣置中、靠右對齊。
-           ⚠️ 寬度要吃 --container-max，不能像分析頁那樣寫死 960px ——
-              這一頁的卡片只有 640px，寫死就會突出卡片外緣對不齊。 */
-        .lang-switch {
+                .lang-switch {
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-end;
@@ -43,8 +39,7 @@
         .lang-btn {
             border: none;
             border-radius: 999px;
-            /* 站在頁面漸層背景上，每顆按鈕自己要有底色才看得清楚 */
-            background: rgba(255,255,255,0.75);
+                        background: rgba(255,255,255,0.75);
             backdrop-filter: blur(4px);
             box-shadow: 0 1px 4px rgba(15,23,42,0.12);
             color: #475569;
@@ -68,8 +63,7 @@
             border: none;
             border-radius: 999px;
             cursor: pointer;
-            /* 手機 3 欄時欄寬只有 ~100px，字級略縮才容得下最長的「背景：影片」 */
-            font-size: 13px;
+                        font-size: 13px;
             padding: 11px 6px;
             text-align: center;
             white-space: nowrap;
@@ -108,9 +102,7 @@
             margin: 0 0 10px;
         }
 
-        /* 三顆一排（開啟／關閉合併成一顆之後）。手機上也是一排，
-           省下的那一排高度直接讓相機畫面往上移。 */
-        .cam-buttons {
+                .cam-buttons {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 6px;
@@ -120,22 +112,18 @@
             .cam-buttons { gap: 10px; }
         }
 
-        /* 三欄時每欄只有約 115px，英文的 "Start Recording" 放不下。
-           這一排允許換行，不要沿用 .control-btn 的 nowrap。 */
-        .cam-buttons .control-btn {
+                .cam-buttons .control-btn {
             white-space: normal;
             line-height: 1.25;
         }
 
         .cam-open  { background: #14b8a6; color: #f0fdfa; }
-        /* 相機開著時這顆變成「關閉相機」—— 收斂成灰色，不要跟錄影鈕搶注意力 */
-        .cam-open.on { background: #e2e8f0; color: #475569; }
+                .cam-open.on { background: #e2e8f0; color: #475569; }
         .cam-flip  { background: #ccfbf1; color: #115e59; }
         .cam-rec   { background: #f87171; color: #fff; }
         .cam-rec.on { background: #dc2626; }
 
-        /* 取景提示：跟規格說明分開兩行，才不會被 camSay() 的訊息蓋掉 */
-        .cam-check {
+                .cam-check {
             margin: 8px 0 0;
             padding: 8px 10px;
             border-radius: 8px;
@@ -151,10 +139,7 @@
             border-color: #fde68a;
         }
 
-        /* 跟上面的預覽／取景提示拉開一點，不要黏在一起。
-           ⚠️ 要寫成 .seg-row.cam-fps-row —— 共用的 .seg-row（margin: 0 0 10px）
-              定義在這條後面，同權重時後面的勝出，只寫 .cam-fps-row 會被蓋掉。 */
-        .seg-row.cam-fps-row { margin: 18px 0 0; }
+                .seg-row.cam-fps-row { margin: 18px 0 0; }
         .cam-fps-row .seg-buttons { background: #ccfbf1; }
         .cam-fps-row .seg-btn { color: #115e59; }
         .cam-fps-row .seg-btn.active { background: #0d9488; color: #f0fdfa; }
@@ -170,8 +155,7 @@
         }
         #camPreview { width: 100%; height: auto; display: block; }
 
-        /* 錄影中的紅點，讓使用者確定真的在錄 */
-        .cam-rec-dot {
+                .cam-rec-dot {
             position: absolute;
             top: 8px;
             left: 8px;
@@ -208,8 +192,7 @@
         .seg-buttons {
             display: flex;
             gap: 4px;
-            /* 面板底色是 #f8fafc，分段按鈕要再深一階才分得出來 */
-            background: #e8edf7;
+                        background: #e8edf7;
             border-radius: 12px;
             padding: 3px;
         }
@@ -236,33 +219,22 @@
             cursor: not-allowed;
         }
 
-        /* 卡片外面的頂列：左邊是分析／錄影頁籤，右邊是語言鈕。
-           兩者跟卡片同寬、同樣置中，所以左右會各自跟卡片的左右緣切齊。
-           排在同一列而不是各佔一列，省下的高度直接讓卡片內容往上移。 */
-        .top-bar {
+                .top-bar {
             display: flex;
-            /* flex-end：頁籤要坐在卡片上緣，跟卡片連起來 */
-            align-items: flex-end;
+                        align-items: flex-end;
             justify-content: space-between;
             gap: 8px;
             max-width: var(--container-max, 960px);
             width: 100%;
             box-sizing: border-box;
-            /* ⚠️ 下方不留間距 —— 有間距就變成浮在上面，連接感會斷掉 */
-            margin: 0 auto;
-            /* 內縮避開卡片的 20px 圓角，頁籤才不會掉到圓弧外面 */
-            padding: 0 16px;
+                        margin: 0 auto;
+                        padding: 0 16px;
         }
 
-        /* 這兩個原本各自負責置中與寬度，放進 .top-bar 之後改由它排版 */
-        .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px auto; padding: 0; }
+                .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px auto; padding: 0; }
         .top-bar .page-tabs { margin: 0; }
 
-        /* 頁籤：分析 ↔ 錄影。Bootstrap 3 nav-tabs 那種「資料夾頁籤」的感覺 ——
-           選中的跟下方卡片連成一塊，未選中的是平的。
-           ⚠️ 沒有畫 Bootstrap 那條硬底線：卡片圓角 20px，直線在兩端會對不起來。
-              連接感改用「同底色 + 往上的陰影 + 貼著卡片上緣」做。 */
-        .page-tabs {
+                .page-tabs {
             display: flex;
             align-items: flex-end;
             gap: 4px;
@@ -271,8 +243,7 @@
         }
 
         .page-tab {
-            /* 只有上面兩角是圓的，下緣是平的才接得住卡片 */
-            border-radius: 10px 10px 0 0;
+                        border-radius: 10px 10px 0 0;
             padding: 8px 18px;
             font-size: 13px;
             font-weight: 600;
@@ -289,11 +260,7 @@
             text-decoration: none;
         }
 
-        /* 目前這一頁的頁籤是 <span> 不是 <a> —— 點自己沒有意義，
-           也不該讓使用者按了整頁重載。
-           ⚠️ 底色要**跟卡片一模一樣**（#f9fbff），差一點就會看到接縫。
-              陰影只往上（0 -3px），往下打會在接縫處畫出一條線。 */
-        .page-tab.active {
+                .page-tab.active {
             background: #f9fbff;
             color: #1d4ed8;
             padding-bottom: 10px;
@@ -313,8 +280,7 @@
             line-height: 1.6;
         }
 
-        /* 錄影完成後，交棒失敗時的退路：直接給下載連結 */
-        .cam-fallback {
+                .cam-fallback {
             margin-top: 10px;
             padding: 10px 12px;
             background: #fff7ed;

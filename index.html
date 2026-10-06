@@ -57,11 +57,7 @@
     </script>
         <link rel="stylesheet" href="site.css" />
     <style>
-        /* 語言切換：固定在畫面右上角，不隨捲動位置改變 */
-        /* 放在白色卡片「外面」正上方，跟卡片同寬、同樣置中，靠右對齊——
-           跟著卡片走但不疊在卡片裡面，不管視窗多寬都跟卡片右邊緣切齊，
-           也完全不會跟卡片內的標題/按鈕重疊，不需要再處理重疊斷點。 */
-        .lang-switch {
+                        .lang-switch {
             display: flex;
             flex-wrap: wrap;
             justify-content: flex-end;
@@ -75,9 +71,7 @@
         .lang-btn {
             border: none;
             border-radius: 999px;
-            /* 現在是站在頁面的漸層背景上（不是疊在白卡片上面），
-               每顆按鈕自己要有底色才看得清楚，不能再依賴外層容器的背景 */
-            background: rgba(255,255,255,0.75);
+                        background: rgba(255,255,255,0.75);
             backdrop-filter: blur(4px);
             box-shadow: 0 1px 4px rgba(15,23,42,0.12);
             color: #475569;
@@ -92,33 +86,23 @@
             color: #eff6ff;
         }
 
-        /* 本頁要放影片與控制項，卡片是所有頁面裡最寬的（共用預設值就是 960px，
-           這裡寫出來是為了讓人一眼看到本頁的寬度設定，不必去翻 site.css） */
-        :root {
+                :root {
             --container-max: 960px;
         }
 
-        /* 本頁內容密度高，桌機時的內距比另外兩頁收緊一點 */
-        @media (min-width: 768px) {
+                @media (min-width: 768px) {
             .container {
                 padding: 24px 28px 22px;
             }
         }
 
-        /* 標題下方緊接著控制按鈕，需要比另外兩頁更多的下方留白 */
-        h1 {
+                h1 {
             margin-bottom: 14px;
             letter-spacing: 0.5px;
         }
 
-        /* ⚠️ 卡片內的區塊一律跟著 .container 走，不要再各自設 max-width。
-           以前有幾個區塊限制在 860px，但標題、影片、播放狀態、頁尾是卡片全寬（904px），
-           電腦版看起來就一段寬一段窄。v2.40 統一拿掉了。 */
-
-        /* 主控制區：六顆常用按鈕排成一排三顆、共兩排。
-           ⚠️ 三欄時每欄只有約 110px，英文的 "Start Recording"、
-              "Display Settings" 放不下，所以這一區允許換行（見下面的 white-space）。 */
-        .controls {
+        
+                .controls {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 8px;
@@ -138,8 +122,7 @@
             border: none;
             border-radius: 999px;
             cursor: pointer;
-            /* 手機 3 欄時欄寬只有 ~100px，字級略縮才容得下最長的「背景：影片」 */
-            font-size: 13px;
+                        font-size: 13px;
             padding: 11px 6px;
             text-align: center;
             white-space: nowrap;
@@ -164,44 +147,37 @@
             box-shadow: none;
         }
 
-        /* 選擇檔案：灰色 */
-        .upload-btn {
+                .upload-btn {
             background: #e5e7eb;
             color: #111827;
         }
 
-        /* 播放：綠色（柔和一點） */
-        .play-btn {
+                .play-btn {
             background: #4ade80;
             color: #064e3b;
         }
 
-        /* 暫停：橙色（偏柔和） */
-        .pause-btn {
+                .pause-btn {
             background: #fdba74;
             color: #7c2d12;
         }
 
-        /* 重播：藍色（配合主題） */
-        .reset-btn {
+                .reset-btn {
             background: #60a5fa;
             color: #eff6ff;
         }
 
-        /* 骨架開關：淡藍灰 */
-        .toggle-btn {
+                .toggle-btn {
             background: #bfdbfe;
             color: #1e3a8a;
         }
 
-        /* 純黑背景：深灰 */
-        .blackbg-btn {
+                .blackbg-btn {
             background: #475569;
             color: #f8fafc;
         }
 
-        /* 錄製：紅色（不要太亮） */
-        .record-btn {
+                .record-btn {
             background: #f97373;
             color: #fff5f5;
         }
@@ -223,8 +199,7 @@
             opacity: 0.96;
         }
 
-        /* 顯示設定：收合式，展開後放骨架/背景切換與軌跡多選 */
-        .findings {
+                .findings {
             margin: 10px 0 0;
             background: #f9fbff;
             border: 1px solid #e2e8f0;
@@ -253,8 +228,7 @@
             color: #334155;
         }
 
-        /* 用色點分級：紅＝要處理，綠＝沒問題，灰＝中性資訊 */
-        .finding::before {
+                .finding::before {
             content: "";
             position: absolute;
             left: 4px;
@@ -269,33 +243,22 @@
         .finding-good::before { background: #22c55e; }
 
 
-        /* 卡片外面的頂列：左邊是分析／錄影頁籤，右邊是語言鈕。
-           兩者跟卡片同寬、同樣置中，所以左右會各自跟卡片的左右緣切齊。
-           排在同一列而不是各佔一列，省下的高度直接讓卡片內容往上移。 */
-        .top-bar {
+                .top-bar {
             display: flex;
-            /* flex-end：頁籤要坐在卡片上緣，跟卡片連起來 */
-            align-items: flex-end;
+                        align-items: flex-end;
             justify-content: space-between;
             gap: 8px;
             max-width: var(--container-max, 960px);
             width: 100%;
             box-sizing: border-box;
-            /* ⚠️ 下方不留間距 —— 有間距就變成浮在上面，連接感會斷掉 */
-            margin: 0 auto;
-            /* 內縮避開卡片的 20px 圓角，頁籤才不會掉到圓弧外面 */
-            padding: 0 16px;
+                        margin: 0 auto;
+                        padding: 0 16px;
         }
 
-        /* 這兩個原本各自負責置中與寬度，放進 .top-bar 之後改由它排版 */
-        .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px auto; padding: 0; }
+                .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px auto; padding: 0; }
         .top-bar .page-tabs { margin: 0; }
 
-        /* 頁籤：分析 ↔ 錄影。Bootstrap 3 nav-tabs 那種「資料夾頁籤」的感覺 ——
-           選中的跟下方卡片連成一塊，未選中的是平的。
-           ⚠️ 沒有畫 Bootstrap 那條硬底線：卡片圓角 20px，直線在兩端會對不起來。
-              連接感改用「同底色 + 往上的陰影 + 貼著卡片上緣」做。 */
-        .page-tabs {
+                .page-tabs {
             display: flex;
             align-items: flex-end;
             gap: 4px;
@@ -304,8 +267,7 @@
         }
 
         .page-tab {
-            /* 只有上面兩角是圓的，下緣是平的才接得住卡片 */
-            border-radius: 10px 10px 0 0;
+                        border-radius: 10px 10px 0 0;
             padding: 8px 18px;
             font-size: 13px;
             font-weight: 600;
@@ -322,11 +284,7 @@
             text-decoration: none;
         }
 
-        /* 目前這一頁的頁籤是 <span> 不是 <a> —— 點自己沒有意義，
-           也不該讓使用者按了整頁重載。
-           ⚠️ 底色要**跟卡片一模一樣**（#f9fbff），差一點就會看到接縫。
-              陰影只往上（0 -3px），往下打會在接縫處畫出一條線。 */
-        .page-tab.active {
+                .page-tab.active {
             background: #f9fbff;
             color: #1d4ed8;
             padding-bottom: 10px;
@@ -349,8 +307,7 @@
             line-height: 1.6;
         }
 
-        /* 「顯示設定」面板內的分段控制（播放速度、軌跡樣式共用）：標籤在左、按鈕在右 */
-        .seg-row {
+                .seg-row {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -366,8 +323,7 @@
         .seg-buttons {
             display: flex;
             gap: 4px;
-            /* 面板底色是 #f8fafc，分段按鈕要再深一階才分得出來 */
-            background: #e8edf7;
+                        background: #e8edf7;
             border-radius: 12px;
             padding: 3px;
         }
@@ -394,11 +350,7 @@
             cursor: not-allowed;
         }
 
-        /* ⚠️ 卡片底色是 #f9fbff，非常淺。原本這顆用 #eef2ff，
-           對比只有 1.08:1，等於看不出邊界。淺色系在這張卡片上靠底色是拉不出對比的
-           （最深的藍調也只到 1.44:1），所以一定要靠邊框給輪廓。 */
-        /* 進到 .controls 的格子裡，所以不再自己設寬度與邊距，只留配色與邊框 */
-        .settings-toggle {
+                        .settings-toggle {
             border: 1px solid #a5b4fc;
             background: #dbe4ff;
             color: #1e3a8a;
@@ -485,8 +437,7 @@
             display: block;
         }
 
-        /* 純黑背景模式時把原始 video 元素藏起來，只留 canvas 的繪製結果 */
-        .canvas-container.black-bg #videoElement {
+                .canvas-container.black-bg #videoElement {
             visibility: hidden;
         }
 
@@ -495,9 +446,7 @@
             width: 100%;
         }
 
-        /* 影片內容躺著時：整層轉 90 度，並用 JS 設定尺寸讓它剛好填滿容器。
-           width/height 互換是因為旋轉後長寬也互換了。 */
-        .canvas-container.rotated .rot-inner {
+                .canvas-container.rotated .rot-inner {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -531,8 +480,7 @@
             white-space: pre-line;
         }
 
-        /* 投擲次數顏色圖例 */
-        .legend {
+                .legend {
             display: none;
             flex-wrap: wrap;
             gap: 8px;
@@ -578,9 +526,7 @@
 
         .info-label {
             font-weight: 600;
-            /* 值的內容變多時（例如鏢次圖例有很多色塊），
-               flex 會把標籤壓到換行，所以固定不縮、不斷行 */
-            flex: 0 0 auto;
+                        flex: 0 0 auto;
             white-space: nowrap;
         }
 
@@ -589,9 +535,7 @@
             color: #1d4ed8;
         }
 
-        /* 鏢次選擇：放在影片正下方，手比較好按 */
-        /* === 飛行軌跡與出手方向 === */
-        .dart-panel {
+                        .dart-panel {
             margin: 0 0 10px;
             padding: 10px 12px;
             border: 1px solid #fcd34d;
@@ -636,8 +580,7 @@
             font-weight: 500;
         }
 
-        /* 一排三顆 —— 一局三鏢，每一排剛好是一輪，數鏢次不用從頭算 */
-        .throw-legend {
+                .throw-legend {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 6px;
@@ -660,8 +603,7 @@
             font-family: inherit;
         }
 
-        /* 被關掉的鏢次：整顆變淡並加刪除線，一眼看出「這鏢沒在畫面上」 */
-        .throw-chip.off {
+                .throw-chip.off {
             background: #f1f5f9;
             color: #94a3b8;
             text-decoration: line-through;
@@ -671,8 +613,7 @@
             opacity: 0.35;
         }
 
-        /* 目前這一鏢：加深底色與外框，一眼看出畫面上正在長的是哪一條 */
-        .throw-chip.current {
+                .throw-chip.current {
             background: #dbeafe;
             color: #1e3a8a;
             box-shadow: 0 0 0 1.5px #60a5fa;
@@ -682,8 +623,7 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            /* 淺色色塊（例如黃、翠）在白底上邊界會糊掉，補一圈淡灰描邊 */
-            box-shadow: 0 0 0 1px rgba(15,23,42,0.18);
+                        box-shadow: 0 0 0 1px rgba(15,23,42,0.18);
             flex: 0 0 auto;
         }
     </style>
