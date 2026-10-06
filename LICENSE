@@ -1,7 +1,7 @@
 版權所有 © 2026 葉信男 YEH HSIN NAN．保留一切權利
 Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
 
-飛鏢投擲骨架分析器 (Darts Throwing Pose Analyzer)
+飛鏢投擲骨架分析 (Darts Throwing Pose Analysis)
 
 
 ================================================================
@@ -24,6 +24,11 @@ Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
     3. 將本軟體之全部或部分，用於任何商業用途、營利行為或併入其他產品或服務。
     4. 移除、變更或遮蔽本軟體中之著作權宣告、授權聲明或其他權利標示。
     5. 轉授權、出租、出借、販售本軟體或以其他方式提供第三人使用。
+    6. 以爬取、鏡像、自動化擷取、反混淆、還原壓縮或其他方式，取得、重建或分析本軟體之
+       程式碼、演算法、處理流程、判斷條件或參數，包括使用人工智慧或機器學習工具為之。
+    7. 將前款所得之內容，或本軟體之演算法、處理流程、參數，用於開發、訓練或改良
+       任何與本軟體相同或相類似之產品、服務或模型。
+    8. 規避、破壞或干擾本軟體之任何技術保護措施。
 
 三、無擔保聲明
     本軟體係以「現狀」提供，著作權人不為任何明示或默示之擔保，包括但不限於
@@ -34,7 +39,24 @@ Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
     於法律允許之最大範圍內，著作權人對於因使用或無法使用本軟體所生之任何
     直接、間接、附帶、特殊、懲罰性或衍生性損害，均不負賠償責任。
 
-五、其他授權洽詢
+五、智慧財產權之保留
+    除本條款明文授予者外，著作權人未授予任何其他權利。本軟體所涉之專利權（包括已申請、
+    將申請或可得申請者）、營業秘密、商標及其他智慧財產權，均由著作權人保留；
+    本條款不構成任何明示或默示之專利授權。
+
+六、終止
+    使用者違反本條款任一規定者，其使用授權即自動終止，且應立即停止使用本軟體；
+    終止不影響著作權人依法請求損害賠償及其他救濟之權利。
+
+七、意見回饋
+    使用者就本軟體所提出之建議、問題回報或構想，著作權人得自由使用，無須給付報酬，
+    亦不因此取得本軟體之任何權利。
+
+八、準據法與管轄
+    本條款以中華民國法律為準據法。因本條款所生之爭議，以臺灣臺北地方法院為第一審
+    管轄法院。
+
+九、其他授權洽詢
     如需取得商業授權、合作或其他使用授權，請與著作權人聯繫。
 
 
@@ -63,6 +85,16 @@ copyright laws and international copyright treaties.
       proprietary notice contained in the Software.
    e. Sublicense, rent, lease, sell, or otherwise make the Software
       available to any third party.
+   f. Crawl, mirror, scrape, de-obfuscate, un-minify, or otherwise obtain,
+      reconstruct, or analyze the code, algorithms, processing pipeline,
+      decision rules, or parameters of the Software, including by means of
+      artificial-intelligence or machine-learning tools.
+   g. Use anything obtained under (f), or the algorithms, processing
+      pipeline, or parameters of the Software, to develop, train, or
+      improve any product, service, or model that is the same as or similar
+      to the Software.
+   h. Circumvent, disable, or interfere with any technical protection
+      measure of the Software.
 
 3. DISCLAIMER OF WARRANTY
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
@@ -75,7 +107,29 @@ copyright laws and international copyright treaties.
    PUNITIVE, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH
    THE USE OF OR INABILITY TO USE THE SOFTWARE.
 
-5. COMMERCIAL LICENSING
+5. RESERVATION OF RIGHTS
+   No rights are granted other than those expressly stated herein. All
+   patent rights (including those filed, to be filed, or capable of being
+   filed), trade secrets, trademarks, and other intellectual property
+   rights relating to the Software are reserved by the Copyright Holder.
+   Nothing herein grants any express or implied license under any patent.
+
+6. TERMINATION
+   Any breach of this license automatically terminates the rights granted
+   hereunder, and the user must immediately cease using the Software.
+   Termination does not limit any other remedy available at law.
+
+7. FEEDBACK
+   Suggestions, bug reports, or ideas that users provide regarding the
+   Software may be used freely by the Copyright Holder without
+   compensation, and give the user no rights in the Software.
+
+8. GOVERNING LAW AND JURISDICTION
+   This license is governed by the laws of the Republic of China (Taiwan).
+   The Taiwan Taipei District Court shall have jurisdiction as the court of
+   first instance over any dispute arising from this license.
+
+9. COMMERCIAL LICENSING
    For commercial licensing, partnership, or other usage permissions,
    please contact the Copyright Holder.
 
