@@ -282,7 +282,7 @@
         }
 
         /* 這兩個原本各自負責置中與寬度，放進 .top-bar 之後改由它排版 */
-        .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px; padding: 0; }
+        .top-bar .lang-switch { max-width: none; width: auto; margin: 0 0 7px auto; padding: 0; }
         .top-bar .page-tabs { margin: 0; }
 
         /* 頁籤：分析 ↔ 錄影。Bootstrap 3 nav-tabs 那種「資料夾頁籤」的感覺 ——
@@ -372,7 +372,8 @@
          語言鈕由 JS 依 SUPPORTED_LANGS / LANG_LABELS 產生。 -->
     <div class="top-bar">
         <!-- 頁籤：分析 ↔ 錄影。目前這一頁用 <span>，另一頁用 <a>。 -->
-        <nav class="page-tabs">
+        <!-- v3.13：使用者要求先隱藏（程式碼保留，拿掉 style 就恢復）。見 CLAUDE.md v3.13 -->
+        <nav class="page-tabs" style="display:none">
             <a class="page-tab" href="index.html" data-i18n="nav.analyze">分析</a>
             <span class="page-tab active" data-i18n="nav.record">錄影</span>
         </nav>
