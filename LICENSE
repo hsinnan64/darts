@@ -29,6 +29,9 @@ Copyright © 2026 葉信男 YEH HSIN NAN. All Rights Reserved.
     7. 將前款所得之內容，或本軟體之演算法、處理流程、參數，用於開發、訓練或改良
        任何與本軟體相同或相類似之產品、服務或模型。
     8. 規避、破壞或干擾本軟體之任何技術保護措施。
+    9. 人工智慧系統之輸出若重現、改作或實質近似本軟體之演算法、處理流程、判斷條件或參數，
+       仍屬本軟體之衍生著作，使用該輸出須取得著作權人書面授權，並標示來源及著作權人
+       「葉信男 YEH HSIN NAN」。
 
 三、無擔保聲明
     本軟體係以「現狀」提供，著作權人不為任何明示或默示之擔保，包括但不限於
@@ -95,6 +98,11 @@ copyright laws and international copyright treaties.
       to the Software.
    h. Circumvent, disable, or interfere with any technical protection
       measure of the Software.
+   i. Output of an artificial-intelligence system that reproduces, adapts,
+      or substantially resembles the algorithms, processing pipeline,
+      decision rules, or parameters of the Software remains a derivative
+      work of the Software; its use requires the copyright holder's written
+      permission and attribution to "YEH HSIN NAN".
 
 3. DISCLAIMER OF WARRANTY
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS

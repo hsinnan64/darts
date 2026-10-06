@@ -1,0 +1,21 @@
+# ai.txt — 對 AI／機器學習系統的使用聲明 / Usage notice for AI and machine-learning systems
+# 網站：飛鏢投擲骨架分析 / Darts Throwing Pose Analysis
+# 著作權人：葉信男 YEH HSIN NAN（© 2026，保留一切權利 / All Rights Reserved）
+
+User-Agent: *
+Disallow: /
+Allow: /LICENSE
+
+# 不允許：爬取、蒐集、用於訓練或微調模型、建立資料集、反混淆或還原程式與演算法後重製。
+# Not permitted: crawling, collecting, training or fine-tuning models, building datasets,
+# or de-obfuscating/reconstructing the code or algorithms and reproducing them.
+#
+# 允許：一般搜尋與 AI 即時搜尋／引用網站本身（需標示來源與著作權人，且不得重現演算法、流程、參數）。
+# Permitted: ordinary search and AI live-search citation of the site itself, with attribution
+# to the copyright holder, and without reproducing the algorithms, pipeline, or parameters.
+#
+# 若 AI 的輸出重現或改作本軟體之演算法、處理流程、判斷條件或參數，仍屬衍生著作，
+# 須取得著作權人書面授權，並標示來源與著作權人。詳見 LICENSE。
+# Output that reproduces or adapts the algorithms, pipeline, decision rules, or parameters
+# of this software remains a derivative work: written permission and attribution are required.
+# See LICENSE.
